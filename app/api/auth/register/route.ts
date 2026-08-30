@@ -49,6 +49,14 @@ export async function POST(request: Request) {
       );
     }
 
+    console.error("register_failed", {
+      code:
+        error instanceof Prisma.PrismaClientKnownRequestError
+          ? error.code
+          : undefined,
+      name: error instanceof Error ? error.name : "UnknownError",
+    });
+
     return NextResponse.json(
       { message: "Não foi possível criar a conta agora." },
       { status: 500 },

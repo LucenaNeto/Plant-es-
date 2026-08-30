@@ -1,44 +1,25 @@
 import { PageHeader } from "@/components/ui/page-header";
-import { sampleUnits } from "@/lib/mock-data";
-import { formatCurrency } from "@/lib/format";
+import { UnitManagement } from "@/features/units/unit-management";
+import { requireSession } from "@/lib/auth/session";
+import { prisma } from "@/lib/db/prisma";
+import { serializeUnit } from "@/lib/units/serializer";
 
-export default function UnidadesPage() {
+export default async function UnidadesPage() {
+  const session = await requireSession();
+  const units = await prisma.unit.findMany({
+    orderBy: [{ active: "desc" }, { name: "asc" }],
+    where: { userId: session.user.id },
+  });
+
   return (
     <div className="space-y-5">
       <PageHeader
         eyebrow="Unidades"
         title="Locais de trabalho"
-        description="Base para cadastrar hospitais, UPAs, clínicas e unidades fixas com valores padrão."
-        actionLabel="Nova unidade"
+        description="Cadastre hospitais, UPAs, clínicas e unidades fixas com valores padrão para agilizar os próximos plantões."
       />
 
-      <section className="space-y-3">
-        {sampleUnits.map((unit) => (
-          <article className="rounded-lg border border-zinc-200 bg-white p-4" key={unit.name}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="font-semibold">{unit.name}</h2>
-                <p className="text-sm text-zinc-500">
-                  {unit.type} em {unit.city}
-                </p>
-              </div>
-              <span className="rounded-md bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700">
-                {unit.isFixed ? "Fixa" : "Extra"}
-              </span>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-zinc-500">Valor padrão</p>
-                <strong>{formatCurrency(unit.defaultValue)}</strong>
-              </div>
-              <div>
-                <p className="text-zinc-500">Carga horária</p>
-                <strong>{unit.defaultHours}h</strong>
-              </div>
-            </div>
-          </article>
-        ))}
-      </section>
+      <UnitManagement initialUnits={units.map(serializeUnit)} />
     </div>
   );
 }

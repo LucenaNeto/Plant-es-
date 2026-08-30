@@ -63,3 +63,22 @@ O Bloco 2 usa Auth.js com provider de credenciais, `bcryptjs` para hash de senha
 - Rotas privadas protegidas por `proxy.ts`
 
 As rotas privadas redirecionam para `/login` quando não há sessão ativa.
+
+Para autenticação funcionar em local e Vercel, configure:
+
+```bash
+AUTH_SECRET="uma-chave-forte"
+AUTH_TRUST_HOST=true
+```
+
+## Unidades
+
+O Bloco 3 implementa cadastro de unidades com isolamento por usuário.
+
+- Listar unidades: `GET /api/units`
+- Criar unidade: `POST /api/units`
+- Buscar unidade: `GET /api/units/:id`
+- Editar unidade: `PATCH /api/units/:id`
+- Inativar unidade: `DELETE /api/units/:id`
+
+Todas as operações privadas validam sessão no servidor e filtram os dados por `userId`.
