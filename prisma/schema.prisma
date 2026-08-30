@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UnitType {
+  hospital
+  upa
+  clinic
+  maternity
+  other
+}
+
+enum ShiftModality {
+  green
+  yellow
+  red
+}
+
+enum ShiftType {
+  fixed
+  extra
+  handoff
+}
+
+enum PaymentStatus {
+  predicted
+  pending
+  received
+}
+
+enum ExpenseCategory {
+  fuel
+  food
+  transport
+  parking
+  lodging
+  other
+}
+
+model User {
+  id             String          @id @default(cuid())
+  name           String
+  email          String          @unique
+  passwordHash   String
+  profession     String
+  specialty      String?
+  avatarUrl      String?
+  phone          String?
+  city           String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  expenses       Expense[]
+  recurringRules RecurringRule[]
+  shifts         Shift[]
+  units          Unit[]
+}
+
+model Unit {
+  id                String          @id @default(cuid())
+  userId            String
+  name              String
+  type              UnitType
+  city              String
+  contactName       String?
+  contactPhone      String?
+  defaultShiftValue Decimal?        @db.Decimal(10, 2)
+  defaultShiftHours Decimal?        @db.Decimal(5, 2)
+  defaultCategory   ShiftModality?
+  isFixed           Boolean         @default(false)
+  notes             String?
+  active            Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  expenses          Expense[]
+  recurringRules    RecurringRule[]
+  shifts            Shift[]
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, active])
+}
+
+model Shift {
+  id              String         @id @default(cuid())
+  userId          String
+  unitId          String
+  shiftDate       DateTime
+  startTime       String
+  endTime         String
+  hours           Decimal        @db.Decimal(5, 2)
+  category        ShiftModality
+  shiftType       ShiftType
+  value           Decimal        @db.Decimal(10, 2)
+  paymentStatus   PaymentStatus  @default(predicted)
+  notes           String?
+  recurringRuleId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  expenses        Expense[]
+  recurringRule   RecurringRule? @relation(fields: [recurringRuleId], references: [id], onDelete: SetNull)
+  unit            Unit           @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, shiftDate])
+  @@index([userId, paymentStatus])
+  @@index([unitId])
+}
+
+model RecurringRule {
+  id                    String        @id @default(cuid())
+  userId                String
+  unitId                String
+  weekdays              Int[]
+  startTime             String
+  endTime               String
+  defaultValue          Decimal       @db.Decimal(10, 2)
+  defaultCategory       ShiftModality
+  defaultShiftType      ShiftType     @default(fixed)
+  replicateFutureMonths Boolean       @default(false)
+  active                Boolean       @default(true)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  shifts                Shift[]
+  unit                  Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, active])
+  @@index([unitId])
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  userId      String
+  unitId      String?
+  shiftId     String?
+  category    ExpenseCategory
+  description String
+  amount      Decimal         @db.Decimal(10, 2)
+  expenseDate DateTime
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  shift       Shift?          @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  unit        Unit?           @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expenseDate])
+  @@index([unitId])
+  @@index([shiftId])
+}
