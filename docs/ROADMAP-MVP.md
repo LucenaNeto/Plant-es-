@@ -39,8 +39,17 @@ Correções de bug incluídas:
   uma unidade inativada quando o campo `active` não vinha no corpo.
 - `callbackUrl` do login aceitava URL absoluta — open redirect.
 
-Migration escrita e **não aplicada**: `shiftDate` e `expenseDate` de
-`TIMESTAMP(3)` para `DATE`.
+Revisão adversarial do próprio bloco encontrou 8 problemas, todos
+reproduzidos antes de corrigir e corrigidos em `a1e4e37`. Os quatro
+críticos: `Response` compartilhada em escopo de módulo (o segundo 404 do
+processo quebrava), `.partial()` do Zod não removendo `.default(false)`
+de `isFixed` (todo PATCH parcial desmarcava "unidade fixa"), guard de
+`callbackUrl` sem bloquear contrabarra (`/\evil.com` ainda escapava), e
+`auth()` fora do `try` (falha de sessão contornava todo o log).
+
+Migration `20260904120000_date_only_shift_and_expense` **aplicada** em
+2026-09-04: `shiftDate` e `expenseDate` de `TIMESTAMP(3)` para `DATE`,
+com `Shift` e `Expense` vazias. Verificado via `information_schema`.
 
 ### Bloco 1 — `feature/plantoes-crud`
 
