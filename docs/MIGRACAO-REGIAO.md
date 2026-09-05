@@ -1,23 +1,55 @@
-# Migrar o banco para `sa-east-1` (São Paulo)
+# Migração do banco para `sa-east-1` (São Paulo)
 
-## Por quê
+> **Executada em 2026-09-05.** Este documento virou registro histórico do
+> procedimento; os passos abaixo continuam válidos caso seja preciso repetir a
+> operação (outra região, outro projeto).
 
-O Supabase está em `ca-central-1` (Canadá). A distância é a causa raiz de dois
-problemas medidos em 2026-09-05:
+## Resultado
 
-| Configuração | 1 consulta | `Promise.all` de 3 |
+| Configuração | 1 consulta | 3 em paralelo |
 |---|---|---|
-| Session 5432, `limit=1` *(atual)* | 131ms | 819ms |
+| Canadá, session 5432 *(antes)* | 122ms | 605ms |
+| **São Paulo, session 5432** *(agora)* | **52ms** | **254ms** |
+| São Paulo, transaction 6543 | 254ms | 760ms |
+
+Tempo real das páginas, com conexão quente:
+
+| Tela | Consultas | São Paulo | Canadá *(derivado)* |
+|---|---|---|---|
+| Plantões | 2 | 166ms | ~390ms |
+| Dashboard | 8 | 477ms | ~980ms |
+
+**Uma previsão que se mostrou errada:** eu estimava que em São Paulo o
+transaction mode custaria 60–100ms. Custa 254ms — continua ~5x mais caro que o
+session mode, a mesma proporção observada no Canadá (784 vs 131). O custo do
+transaction mode não é distância, é processamento do pooler por consulta.
+Mudar de continente não resolve isso, então seguimos em session mode com
+`connection_limit=1`, que já elimina o risco de esgotamento.
+
+Verificação: registros comparados campo a campo, relações conferidas dos dois
+lados, e a camada de serviço do app produzindo saída **byte a byte idêntica**
+nos dois bancos. Nenhum registro foi escrito no banco antigo entre a cópia e a
+troca das variáveis.
+
+## Por que foi feito
+
+O Supabase estava em `ca-central-1` (Canadá). A distância era a causa raiz de
+dois problemas:
+
+| Configuração no Canadá | 1 consulta | `Promise.all` de 3 |
+|---|---|---|
+| Session 5432, `limit=1` | 131ms | 819ms |
 | Transaction 6543, `limit=1` | 784ms | 2273ms |
 
-O transaction mode (6543) é o modo **correto** para serverless: devolve a
-conexão ao pool a cada transação, em vez de prendê-la à vida do processo. Mas
-ele faz mais idas e voltas por consulta, e a ~120ms cada uma, sai 5x mais caro.
-Hoje estamos presos ao session mode, que é rápido mas esgota — já derrubou o
-banco uma vez.
+Toda consulta pagava ~120ms só de ida e volta transatlântica, e o dashboard —
+que faz oito consultas — chegava perto de um segundo.
 
-Com o banco em São Paulo (~10–20ms de RTT), o transaction mode deve custar
-60–100ms. Aí se tem **as duas coisas**: velocidade e escala.
+O transaction mode (6543) é o modo **correto** para serverless: devolve a
+conexão ao pool a cada transação, em vez de prendê-la à vida do processo. A
+expectativa era que, com o banco perto, ele ficasse barato o suficiente para
+adotarmos, resolvendo velocidade e escala de uma vez. **Não foi o que
+aconteceu** — ver "Resultado", acima. Seguimos em session mode com
+`connection_limit=1`, que já elimina o risco de esgotamento por outro caminho.
 
 ## O que não dá para fazer
 

@@ -170,28 +170,32 @@ foram conferidas visualmente em viewport de 375px.
 
 ## Melhorias anotadas (pós-MVP)
 
-- **Região do banco — virou prioridade, não conforto.** O Supabase está em
-  `ca-central-1` (Canadá), e a distância é a causa raiz de dois problemas
-  medidos em 2026-09-05:
+- ✅ **Região do banco — feito em 2026-09-05.** O Supabase saiu de
+  `ca-central-1` (Canadá) para `sa-east-1` (São Paulo). Consulta de 122ms para
+  52ms; a tela de plantões de ~390ms para 166ms. Procedimento, medições e
+  scripts em `docs/MIGRACAO-REGIAO.md`.
+- ✅ **`.gitattributes`** com `text=auto eol=lf`, silenciando o aviso de CRLF.
 
-  | Configuração | 1 consulta | `Promise.all` de 3 |
-  |---|---|---|
-  | Session 5432, `limit=1` *(atual)* | 131ms | 819ms |
-  | Session 5432, `limit=3` | — | 1471ms |
-  | Transaction 6543, `limit=1` | 784ms | 2273ms |
+### Pendentes
 
-  Transaction mode (6543) é o correto para serverless, porque devolve a
-  conexão ao pool a cada transação — mas faz mais idas e voltas, e a
-  ~120ms de RTT cada uma, fica 5x mais lento. Aumentar `connection_limit`
-  também piora: cada conexão nova custa um handshake transatlântico maior
-  que o ganho de paralelizar.
-
-  Com o banco em `sa-east-1` (~10–20ms de RTT), transaction mode passaria a
-  custar talvez 60–100ms — resolvendo escala e velocidade juntos. Exige
-  recriar o projeto Supabase e mover os dados; com 4 unidades e 10 plantões,
-  agora é o momento mais barato.
-- **`.gitattributes`** com `* text=auto eol=lf`, para silenciar o aviso
-  de CRLF do Git em ambiente Windows com deploy Linux.
+- **Consolidar as consultas do dashboard.** Ele faz 8 consultas e, com
+  `connection_limit=1`, elas não paralelizam — 477ms de espera. Aumentar o
+  limite piora (medido: cada conexão nova custa um handshake maior que o ganho).
+  O caminho é fazer menos consultas: `getMonthlyFinance` roda três `groupBy`
+  sobre `Shift` (por status, por unidade, recebido por unidade) que viram um só
+  agrupando por `[unitId, paymentStatus]`; e dois sobre `Expense` que viram um
+  agrupando por `[category, unitId]`. Levaria o dashboard de 8 para 4 consultas,
+  algo perto de 250ms, sem tocar em UI.
+- **Banco de desenvolvimento separado.** Hoje `npm run dev` local conecta no
+  mesmo banco de produção — foi assim que o pool foi esgotado em 2026-09-05.
+  Um projeto Supabase só para desenvolvimento elimina a classe inteira de risco.
+- **Curinga do `contains` do Prisma.** Em `LIKE`, `_` casa com qualquer
+  caractere e `%` com qualquer sequência. Hoje não há busca por texto no app,
+  mas quando houver, os termos precisam ser escapados — senão uma busca por
+  `"UPA_"` traz resultados errados. (Descoberto ao escrever um filtro de
+  verificação que deu falso positivo.)
+- **Rotacionar `AUTH_SECRET`** se o transcrito da sessão de 2026-09-05 não for
+  considerado privado: ele foi impresso por engano em um comando de conferência.
 
 ## Fora do MVP
 
