@@ -153,6 +153,36 @@ export function calculateShiftHours(
 }
 
 /**
+ * Horário de término a partir do início mais uma duração em horas.
+ *
+ * Usado para preencher o fim do plantão a partir da carga padrão da unidade.
+ * O resultado dá a volta em 24h — início 19:00 mais 12h é 07:00, e não "31:00".
+ *
+ * Retorna `null` para entrada inválida, porque aqui a ausência de sugestão é
+ * um resultado legítimo: o campo simplesmente fica em branco para o usuário
+ * preencher.
+ */
+export function addHoursToTime(
+  startTime: string,
+  hours: number,
+): string | null {
+  const start = TIME_OF_DAY.exec(startTime);
+
+  if (!start || !Number.isFinite(hours) || hours <= 0) {
+    return null;
+  }
+
+  const totalMinutes =
+    (Number(start[1]) * 60 + Number(start[2]) + Math.round(hours * 60)) %
+    (24 * 60);
+
+  const hh = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+  const mm = String(totalMinutes % 60).padStart(2, "0");
+
+  return `${hh}:${mm}`;
+}
+
+/**
  * Os dois plantões se sobrepõem no tempo?
  *
  * Compara em minutos absolutos a partir da meia-noite do dia de início, o que

@@ -11,6 +11,14 @@ export type FieldErrors = Record<string, string[] | undefined>;
 
 export type ActionErrorCode =
   | "conflict"
+  /**
+   * A operação é válida, mas encontrou algo que merece o olho do usuário antes
+   * de prosseguir — hoje, plantões com horário sobreposto. Diferente de
+   * `conflict`, não é uma recusa: a UI mostra o aviso e reenvia com a
+   * confirmação. Manter os dois códigos separados evita que um conflito real
+   * de banco seja tratado como algo que basta confirmar.
+   */
+  | "confirmation_required"
   | "forbidden"
   | "not_found"
   | "unauthorized"
