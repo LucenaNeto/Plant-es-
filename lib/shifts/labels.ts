@@ -8,7 +8,7 @@ import type {
 /**
  * Rótulos e estilos dos enums do domínio, em um lugar só.
  *
- * Estavam espalhados entre `lib/mock-data.ts` e arrays literais dentro de
+ * Estavam espalhados entre dados de exemplo e arrays literais dentro de
  * `features/units/unit-management.tsx`. Centralizar aqui garante que "Repasse"
  * se escreva igual na agenda, na lista e no dashboard, e que adicionar um valor
  * ao enum do Prisma quebre o build (os `Record` são exaustivos) em vez de

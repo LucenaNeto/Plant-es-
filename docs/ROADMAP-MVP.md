@@ -11,8 +11,8 @@ Um bloco por branch. Nada é mesclado no `main` sem revisão e autorização.
 | Plantões | 100% mock | **CRUD completo, Server Actions** |
 | Agenda | 100% mock | **calendário real** |
 | Gastos | 100% mock | **CRUD completo, Server Actions** |
-| Finanças | 100% mock | 100% mock |
-| Dashboard | 100% mock | 100% mock |
+| Finanças | 100% mock | **agregações reais** |
+| Dashboard | 100% mock | **agregações reais** |
 | Recuperar senha | Decorativo | Decorativo (fora do MVP) |
 
 ## Blocos
@@ -118,10 +118,29 @@ ausência de buracos, ano bissexto. Mais 8 asserções de virada de mês contra
 o banco: plantão noturno de 30/09 pertence a setembro, não vaza para
 outubro, e ainda assim conflita com a manhã de 01/10.
 
-### Bloco 4 — `feature/financas-dashboard`
+### ✅ Bloco 4 — `feature/financas-dashboard`
 
-Agregações reais: previsto, pendente, recebido, gastos, líquido; receita por
-unidade; gastos por categoria. Remoção de `lib/mock-data.ts`.
+Agregações reais. **`lib/mock-data.ts` removido** — todas as rotas privadas
+agora buildam como dinâmicas, o que prova que nenhuma usa dado falso.
+
+- **Dois líquidos, não um.** "Líquido" sozinho é ambíguo, e a diferença é o
+  que mais importa para quem depende de repasse: `netReceived`
+  (recebido − gastos, o caixa real) e `netProjected` (bruto − gastos, se
+  tudo for pago). Um mês pode parecer ótimo na projeção e não ter entrado
+  nada.
+- Gasto geral não é atribuível a unidade, então fica fora do líquido por
+  unidade e é exposto separadamente — sem esse aviso, a soma por unidade
+  não bate com o total do mês e o usuário deixa de confiar nos números.
+- Dashboard é sempre o mês corrente, sem navegação; quem quer outro mês vai
+  a Finanças. Duplicar o seletor criaria duas telas fazendo o mesmo.
+- `findNextShift` compara por data, não por horário: um plantão que começou
+  às 19h e ainda está em andamento continua sendo "o próximo" até o dia virar.
+
+Verificado com 36 asserções contra o banco: um cenário de números conferidos
+à mão (bruto 4500, gastos 180, líquidos 1820 e 4320), oito **identidades
+contábeis** (incluindo `gastos por unidade + gastos gerais = gastos totais`),
+precisão de centavos (`1234,56 + 2345,67 = 3580,23`), isolamento entre contas
+nos totais e no próximo plantão, e mês vazio sem quebrar.
 
 ### Bloco 5 — `feature/polimento-mvp`
 
