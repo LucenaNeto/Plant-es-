@@ -89,7 +89,7 @@ model Shift {
   id              String         @id @default(cuid())
   userId          String
   unitId          String
-  shiftDate       DateTime
+  shiftDate       DateTime       @db.Date
   startTime       String
   endTime         String
   hours           Decimal        @db.Decimal(5, 2)
@@ -141,7 +141,7 @@ model Expense {
   category    ExpenseCategory
   description String
   amount      Decimal         @db.Decimal(10, 2)
-  expenseDate DateTime
+  expenseDate DateTime        @db.Date
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   shift       Shift?          @relation(fields: [shiftId], references: [id], onDelete: SetNull)

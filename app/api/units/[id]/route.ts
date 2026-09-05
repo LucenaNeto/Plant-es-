@@ -1,117 +1,74 @@
-import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-import { prisma } from "@/lib/db/prisma";
-import { serializeUnit } from "@/lib/units/serializer";
-import { unitPayloadSchema } from "@/lib/validators/units";
+import { withApiAuth, validationResponse } from "@/server/api-handler";
+import {
+  deactivateUnit,
+  findUnit,
+  updateUnit,
+} from "@/server/services/units";
+import { unitUpdateSchema } from "@/lib/validators/units";
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const session = await auth();
+type RouteArg = { params: Promise<{ id: string }> };
 
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "Não autenticado." }, { status: 401 });
-  }
+const NOT_FOUND = NextResponse.json(
+  { message: "Unidade não encontrada." },
+  { status: 404 },
+);
 
-  const { id } = await params;
-  const unit = await prisma.unit.findFirst({
-    where: {
-      id,
-      userId: session.user.id,
-    },
-  });
+export const GET = withApiAuth<RouteArg>(
+  "units.get",
+  async ({ userId }, _request, { params }) => {
+    const { id } = await params;
+    const unit = await findUnit(userId, id);
 
-  if (!unit) {
-    return NextResponse.json({ message: "Unidade não encontrada." }, { status: 404 });
-  }
+    if (!unit) {
+      return NOT_FOUND;
+    }
 
-  return NextResponse.json({ unit: serializeUnit(unit) });
-}
+    return NextResponse.json({ unit });
+  },
+);
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const session = await auth();
+export const PATCH = withApiAuth<RouteArg>(
+  "units.update",
+  async ({ logger, userId }, request, { params }) => {
+    const { id } = await params;
+    const body = await request.json().catch(() => null);
+    const parsedBody = unitUpdateSchema.safeParse(body);
 
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "Não autenticado." }, { status: 401 });
-  }
+    if (!parsedBody.success) {
+      return validationResponse(
+        parsedBody.error.flatten().fieldErrors,
+        "Revise os campos da unidade.",
+      );
+    }
 
-  const { id } = await params;
-  const body = await request.json().catch(() => null);
-  const parsedBody = unitPayloadSchema.safeParse(body);
+    const unit = await updateUnit(userId, id, parsedBody.data);
 
-  if (!parsedBody.success) {
-    return NextResponse.json(
-      {
-        errors: parsedBody.error.flatten().fieldErrors,
-        message: "Revise os campos da unidade.",
-      },
-      { status: 400 },
-    );
-  }
+    if (!unit) {
+      return NOT_FOUND;
+    }
 
-  const existingUnit = await prisma.unit.findFirst({
-    select: { id: true },
-    where: { id, userId: session.user.id },
-  });
+    logger.info("unit.updated", {
+      fields: Object.keys(parsedBody.data),
+      unitId: unit.id,
+    });
 
-  if (!existingUnit) {
-    return NextResponse.json({ message: "Unidade não encontrada." }, { status: 404 });
-  }
+    return NextResponse.json({ unit });
+  },
+);
 
-  const data = parsedBody.data;
-  const unit = await prisma.unit.update({
-    data: {
-      active: data.active ?? true,
-      city: data.city,
-      contactName: data.contactName,
-      contactPhone: data.contactPhone,
-      defaultCategory: data.defaultCategory,
-      defaultShiftHours: data.defaultShiftHours
-        ? new Prisma.Decimal(data.defaultShiftHours)
-        : null,
-      defaultShiftValue: data.defaultShiftValue
-        ? new Prisma.Decimal(data.defaultShiftValue)
-        : null,
-      isFixed: data.isFixed,
-      name: data.name,
-      notes: data.notes,
-      type: data.type,
-    },
-    where: { id },
-  });
+export const DELETE = withApiAuth<RouteArg>(
+  "units.deactivate",
+  async ({ logger, userId }, _request, { params }) => {
+    const { id } = await params;
+    const unit = await deactivateUnit(userId, id);
 
-  return NextResponse.json({ unit: serializeUnit(unit) });
-}
+    if (!unit) {
+      return NOT_FOUND;
+    }
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const session = await auth();
+    logger.info("unit.deactivated", { unitId: unit.id });
 
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "Não autenticado." }, { status: 401 });
-  }
-
-  const { id } = await params;
-  const existingUnit = await prisma.unit.findFirst({
-    select: { id: true },
-    where: { id, userId: session.user.id },
-  });
-
-  if (!existingUnit) {
-    return NextResponse.json({ message: "Unidade não encontrada." }, { status: 404 });
-  }
-
-  const unit = await prisma.unit.update({
-    data: { active: false },
-    where: { id },
-  });
-
-  return NextResponse.json({ unit: serializeUnit(unit) });
-}
+    return NextResponse.json({ unit });
+  },
+);

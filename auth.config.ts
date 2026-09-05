@@ -1,32 +1,31 @@
 import type { NextAuthConfig } from "next-auth";
-
-const privateRoutes = [
-  "/agenda",
-  "/dashboard",
-  "/financas",
-  "/gastos",
-  "/perfil",
-  "/plantoes",
-  "/unidades",
-];
-
-const publicAuthRoutes = ["/cadastro", "/login", "/recuperar-senha"];
+import {
+  DEFAULT_PRIVATE_REDIRECT,
+  isPrivateRoute,
+  isPublicAuthRoute,
+  LOGIN_ROUTE,
+} from "@/lib/routes";
 
 export const authConfig = {
   callbacks: {
+    /**
+     * Callback do middleware nativo do Auth.js. Hoje a proteção de rotas é
+     * feita por `proxy.ts` (Edge, sem custo de sessão), então este callback não
+     * está no caminho de execução — mas fica derivado da mesma fonte de verdade
+     * em `lib/routes.ts` para que não possa divergir se um dia for ligado.
+     */
     authorized({ auth, request }) {
       const { pathname } = request.nextUrl;
       const isLoggedIn = Boolean(auth?.user);
-      const isPrivateRoute = privateRoutes.some((route) =>
-        pathname.startsWith(route),
-      );
 
-      if (isPrivateRoute) {
+      if (isPrivateRoute(pathname)) {
         return isLoggedIn;
       }
 
-      if (isLoggedIn && publicAuthRoutes.includes(pathname)) {
-        return Response.redirect(new URL("/dashboard", request.nextUrl));
+      if (isLoggedIn && isPublicAuthRoute(pathname)) {
+        return Response.redirect(
+          new URL(DEFAULT_PRIVATE_REDIRECT, request.nextUrl),
+        );
       }
 
       return true;
@@ -40,7 +39,7 @@ export const authConfig = {
     },
   },
   pages: {
-    signIn: "/login",
+    signIn: LOGIN_ROUTE,
   },
   providers: [],
   session: {

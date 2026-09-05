@@ -3,6 +3,21 @@
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState, useTransition } from "react";
+import { DEFAULT_PRIVATE_REDIRECT } from "@/lib/routes";
+
+/**
+ * Aceita apenas caminhos internos como destino pós-login. Sem isto,
+ * `?callbackUrl=https://site-falso/` faria o app redirecionar o usuário
+ * recém-autenticado para fora — open redirect, usado em phishing.
+ * `//evil.com` também é rejeitado: o navegador o trata como URL absoluta.
+ */
+function safeCallbackUrl(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return DEFAULT_PRIVATE_REDIRECT;
+  }
+
+  return value;
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -28,7 +43,7 @@ export function LoginForm() {
         return;
       }
 
-      router.push(searchParams.get("callbackUrl") || "/dashboard");
+      router.push(safeCallbackUrl(searchParams.get("callbackUrl")));
       router.refresh();
     });
   }

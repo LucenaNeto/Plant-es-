@@ -52,3 +52,18 @@ export const unitPayloadSchema = z.object({
   notes: optionalText,
   type: unitTypeSchema,
 });
+
+/**
+ * Schema de atualização parcial.
+ *
+ * O handler de PATCH usava o schema de criação, o que produzia dois problemas:
+ * exigia o payload completo (contrariando a semântica de PATCH) e, como
+ * `active` era lido com `?? true`, um PATCH sem esse campo **reativava
+ * silenciosamente** uma unidade que o usuário havia inativado.
+ *
+ * Com o schema parcial, campo ausente significa "não mexer".
+ */
+export const unitUpdateSchema = unitPayloadSchema.partial();
+
+export type UnitPayload = z.infer<typeof unitPayloadSchema>;
+export type UnitUpdatePayload = z.infer<typeof unitUpdateSchema>;
