@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/page-header";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { ProfileForm } from "@/components/forms/profile-form";
 import { getCurrentUser } from "@/lib/auth/current-user";
+
+export const metadata: Metadata = {
+  description: "Seus dados pessoais e profissionais.",
+  title: "Perfil",
+};
+
 
 export default async function PerfilPage() {
   const user = await getCurrentUser();

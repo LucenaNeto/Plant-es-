@@ -1,6 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { LoginForm } from "@/components/forms/login-form";
+
+export const metadata: Metadata = {
+  description: "Acesse sua agenda e controle financeiro de plantões.",
+  title: "Entrar",
+};
+
 
 export default function LoginPage() {
   return (

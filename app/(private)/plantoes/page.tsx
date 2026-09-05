@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
@@ -9,6 +10,12 @@ import { formatCurrency } from "@/lib/format";
 import { shiftFiltersSchema } from "@/lib/validators/shifts";
 import { listShifts, summarizeShifts } from "@/server/services/shifts";
 import { listUnits } from "@/server/services/units";
+
+export const metadata: Metadata = {
+  description: "Lance, edite e acompanhe o recebimento dos seus plantões.",
+  title: "Plantões",
+};
+
 
 /**
  * Interpreta os filtros da query string, caindo no mês corrente quando algo

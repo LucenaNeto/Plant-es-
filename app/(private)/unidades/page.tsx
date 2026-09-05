@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/page-header";
 import { UnitManagement } from "@/features/units/unit-management";
 import { requireSession } from "@/lib/auth/session";
 import { listUnits } from "@/server/services/units";
+
+export const metadata: Metadata = {
+  description: "Hospitais, UPAs e clínicas onde você faz plantão.",
+  title: "Unidades",
+};
+
 
 export default async function UnidadesPage() {
   const session = await requireSession();

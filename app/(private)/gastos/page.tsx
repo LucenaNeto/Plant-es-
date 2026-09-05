@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { ExpenseFilters } from "@/features/expenses/expense-filters";
@@ -13,6 +14,12 @@ import { expenseFiltersSchema } from "@/lib/validators/expenses";
 import { listExpenses, summarizeExpenses } from "@/server/services/expenses";
 import { listShifts } from "@/server/services/shifts";
 import { listUnits } from "@/server/services/units";
+
+export const metadata: Metadata = {
+  description: "Gastos operacionais gerais ou vinculados a unidade e plantão.",
+  title: "Gastos",
+};
+
 
 /**
  * Filtros da query string com o mês corrente como padrão. A URL é editável à

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -11,6 +12,12 @@ import {
 } from "@/lib/expenses/labels";
 import { formatCurrency } from "@/lib/format";
 import { getMonthlyFinance } from "@/server/services/finance";
+
+export const metadata: Metadata = {
+  description: "Quanto entrou, quanto falta receber e quanto sobrou no mês.",
+  title: "Finanças",
+};
+
 
 function resolveMonth(params: Record<string, string | string[] | undefined>) {
   const today = todayAsCalendarDate();

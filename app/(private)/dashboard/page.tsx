@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { QuickAction } from "@/components/ui/quick-action";
 import { StatCard } from "@/components/ui/stat-card";
@@ -17,6 +18,12 @@ import {
 import { getMonthlyFinance } from "@/server/services/finance";
 import { findNextShift } from "@/server/services/shifts";
 import { listUnits } from "@/server/services/units";
+
+export const metadata: Metadata = {
+  description: "Resumo do mês: plantões, recebimentos e gastos.",
+  title: "Início",
+};
+
 
 /**
  * O dashboard é sempre "agora": mês corrente, sem navegação. Quem quer olhar

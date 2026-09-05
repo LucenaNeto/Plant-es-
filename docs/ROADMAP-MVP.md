@@ -13,7 +13,7 @@ Um bloco por branch. Nada é mesclado no `main` sem revisão e autorização.
 | Gastos | 100% mock | **CRUD completo, Server Actions** |
 | Finanças | 100% mock | **agregações reais** |
 | Dashboard | 100% mock | **agregações reais** |
-| Recuperar senha | Decorativo | Decorativo (fora do MVP) |
+| Recuperar senha | Decorativo | Aviso honesto (fora do MVP) |
 
 ## Blocos
 
@@ -142,9 +142,31 @@ contábeis** (incluindo `gastos por unidade + gastos gerais = gastos totais`),
 precisão de centavos (`1234,56 + 2345,67 = 3580,23`), isolamento entre contas
 nos totais e no próximo plantão, e mês vazio sem quebrar.
 
-### Bloco 5 — `feature/polimento-mvp`
+### ✅ Bloco 5 — `feature/polimento-mvp`
 
-Estado ativo na navegação, empty states, PWA/manifest, metadata, acessibilidade.
+- **Navegação com estado ativo** e ícones SVG inline. Num app de cinco abas,
+  sem esse sinal a pessoa toca no item em que já está e conclui que travou.
+  `aria-current="page"` acompanha o destaque visual.
+- **PWA instalável**: manifesto, ícones 192/512 e apple-touch gerados em build
+  por `ImageResponse` — sem binário versionado, a identidade fica junto do
+  tema. `start_url` em `/dashboard`, porque quem instalou já tem conta.
+- **Favicon padrão do Next removido** — o app servia o logo da Vercel na aba.
+- Título com template (`Agenda · Plantões+`), `theme-color`, `viewport-fit:
+  cover` para a barra inferior não ficar sob o indicador de home do iPhone.
+- Pilha de fontes do sistema no lugar de `Arial, Helvetica` do template.
+- Acessibilidade: link "pular para o conteúdo", anel de foco visível e
+  consistente, `prefers-reduced-motion`.
+- **Honestidade de interface**: a prop `actionLabel` do `PageHeader`
+  renderizava um botão sem `onClick`, e `/recuperar-senha` tinha um formulário
+  completo que não enviava nada — o usuário digitaria o e-mail e culparia a
+  própria caixa de entrada. Os dois foram removidos.
+- `.gitattributes` com `text=auto eol=lf`, silenciando o aviso de CRLF.
+
+Verificado no servidor de produção: rotas de ícone servem PNG real (assinatura
+`PNG`) e respondem sem a query de cache que o manifesto não carrega;
+manifesto válido em `application/manifest+json`; as sete rotas privadas
+redirecionam para `/login` com `callbackUrl` **relativo**; e as telas públicas
+foram conferidas visualmente em viewport de 375px.
 
 ## Melhorias anotadas (pós-MVP)
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { AgendaCalendar } from "@/features/agenda/agenda-calendar";
@@ -8,6 +9,12 @@ import {
 } from "@/lib/dates/calendar-date";
 import { formatCurrency } from "@/lib/format";
 import { listShifts, summarizeShifts } from "@/server/services/shifts";
+
+export const metadata: Metadata = {
+  description: "Calendário mensal dos seus plantões.",
+  title: "Agenda",
+};
+
 
 /**
  * A agenda só precisa de mês e ano. Diferente de plantões e gastos, não tem

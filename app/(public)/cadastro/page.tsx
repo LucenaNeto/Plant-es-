@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { RegisterForm } from "@/components/forms/register-form";
+
+export const metadata: Metadata = {
+  description: "Crie sua conta no Plantões+.",
+  title: "Criar conta",
+};
+
 
 export default function CadastroPage() {
   return (
@@ -9,7 +16,7 @@ export default function CadastroPage() {
           <p className="text-sm font-semibold text-teal-700">Plantões+</p>
           <h1 className="mt-2 text-3xl font-semibold">Cadastro</h1>
           <p className="mt-2 text-sm text-zinc-500">
-            Estrutura inicial para criar o usuário piloto.
+            Comece a organizar seus plantões e o financeiro deles.
           </p>
         </div>
 

@@ -8,20 +8,56 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  /*
+    Pilha de fontes do sistema, no lugar do `Arial, Helvetica` que veio do
+    template. Num app mobile-first isso importa: o texto passa a renderizar em
+    SF Pro no iOS e Roboto no Android, acompanhando o resto do aparelho, em vez
+    de parecer uma página web dentro do celular. E não custa requisição nenhuma
+    — nada é baixado.
+  */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono:
+    ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }
 
+/*
+  Controles de formulário não herdam fonte por padrão. Sem isto, os inputs
+  caem para a fonte do navegador em 13px — e no iOS qualquer campo abaixo de
+  16px faz a página dar zoom sozinha ao receber foco.
+*/
 button,
 a,
 input,
 select,
 textarea {
   font: inherit;
+}
+
+/*
+  Anel de foco visível e consistente. O padrão de cada navegador é diferente e
+  alguns somem sobre fundo escuro; quem navega por teclado precisa sempre saber
+  onde está.
+*/
+:focus-visible {
+  outline: 2px solid #0f766e;
+  outline-offset: 2px;
+}
+
+/* Respeita quem pediu menos animação no sistema. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
