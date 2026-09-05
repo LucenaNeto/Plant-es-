@@ -8,7 +8,7 @@ Um bloco por branch. Nada é mesclado no `main` sem revisão e autorização.
 |---|---|---|
 | Autenticação | Funcional (Prisma) | Funcional |
 | Unidades | CRUD via REST | CRUD via REST + camada de serviço |
-| Plantões | 100% mock | 100% mock |
+| Plantões | 100% mock | **CRUD completo, Server Actions** |
 | Agenda | 100% mock | 100% mock |
 | Gastos | 100% mock | 100% mock |
 | Finanças | 100% mock | 100% mock |
@@ -51,11 +51,27 @@ Migration `20260904120000_date_only_shift_and_expense` **aplicada** em
 2026-09-04: `shiftDate` e `expenseDate` de `TIMESTAMP(3)` para `DATE`,
 com `Shift` e `Expense` vazias. Verificado via `information_schema`.
 
-### Bloco 1 — `feature/plantoes-crud`
+### ✅ Bloco 1 — `feature/plantoes-crud`
 
-Núcleo do produto. Criar, editar, duplicar, excluir plantão; marcar recebido;
-preencher automaticamente a partir dos padrões da unidade; filtrar por mês,
-unidade e status; avisar (sem bloquear) sobre sobreposição de horário.
+Núcleo do produto, com Server Actions sobre `runAuthenticatedAction`.
+
+- Criar, editar, duplicar, excluir; avançar situação de pagamento.
+- Autofill dos padrões da unidade (valor, modalidade e término calculado
+  a partir da carga padrão). Só preenche campo vazio.
+- Filtros de mês, unidade e situação na query string — o botão voltar
+  funciona e `/plantoes?unitId=...` da tela de unidades passa a valer.
+- Sobreposição avisa sem bloquear, com confirmação em segundo envio.
+  A busca varre 3 dias: plantão noturno invade o dia seguinte.
+- Carga horária derivada de início/fim, nunca digitada.
+- Unidade inativa recusa plantão novo, mas não trava a edição de um
+  plantão histórico que já a referencia.
+
+Verificado contra o banco real com 30 asserções (usuários de teste
+criados e removidos em `finally`, banco conferido antes e depois):
+derivação de horas em plantão noturno, data sem deslocamento de fuso,
+limites do mês (30/09 dentro, 01/10 fora), soma do resumo, e **sete
+asserções de isolamento entre contas** — listar, ler, editar, excluir,
+mudar pagamento, vincular unidade alheia e detectar conflito.
 
 ### Bloco 2 — `feature/gastos-crud`
 
@@ -73,6 +89,16 @@ unidade; gastos por categoria. Remoção de `lib/mock-data.ts`.
 ### Bloco 5 — `feature/polimento-mvp`
 
 Estado ativo na navegação, empty states, PWA/manifest, metadata, acessibilidade.
+
+## Melhorias anotadas (pós-MVP)
+
+- **Região do banco.** O Supabase está em `ca-central-1` (Canadá).
+  Consultas quentes medem ~123ms constantes a partir do Brasil; a
+  primeira conexão chegou a 1269ms. Migrar para `sa-east-1` (São Paulo)
+  cortaria cerca de 100ms por consulta. Exige recriar o projeto e mover
+  os dados — mais barato agora, com poucos dados, do que depois.
+- **`.gitattributes`** com `* text=auto eol=lf`, para silenciar o aviso
+  de CRLF do Git em ambiente Windows com deploy Linux.
 
 ## Fora do MVP
 
