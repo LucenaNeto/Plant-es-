@@ -1,0 +1,125 @@
+# Migrar o banco para `sa-east-1` (São Paulo)
+
+## Por quê
+
+O Supabase está em `ca-central-1` (Canadá). A distância é a causa raiz de dois
+problemas medidos em 2026-09-05:
+
+| Configuração | 1 consulta | `Promise.all` de 3 |
+|---|---|---|
+| Session 5432, `limit=1` *(atual)* | 131ms | 819ms |
+| Transaction 6543, `limit=1` | 784ms | 2273ms |
+
+O transaction mode (6543) é o modo **correto** para serverless: devolve a
+conexão ao pool a cada transação, em vez de prendê-la à vida do processo. Mas
+ele faz mais idas e voltas por consulta, e a ~120ms cada uma, sai 5x mais caro.
+Hoje estamos presos ao session mode, que é rápido mas esgota — já derrubou o
+banco uma vez.
+
+Com o banco em São Paulo (~10–20ms de RTT), o transaction mode deve custar
+60–100ms. Aí se tem **as duas coisas**: velocidade e escala.
+
+## O que não dá para fazer
+
+**Não é possível trocar a região de um projeto Supabase existente.** A região é
+fixada na criação. O caminho oficial é criar outro projeto e migrar.
+
+## Por que a nossa migração é simples
+
+O guia genérico da Supabase fala em migrar Auth, Storage, RLS e chaves anônimas.
+**Nada disso se aplica aqui.** Este app usa Supabase como um Postgres e mais
+nada: a autenticação é Auth.js com a tabela `User` própria, via Prisma. Não há
+RLS, não há SDK da Supabase, não há chave anônima. É uma connection string.
+
+Como os arquivos de migration do Prisma estão versionados, o schema se
+reconstrói sozinho no destino. Só os dados precisam ser copiados — e são poucos.
+
+---
+
+## Passo a passo
+
+### 1. Criar o projeto novo (você)
+
+No painel da Supabase, novo projeto, e **selecionar `South America (São Paulo)`
+`sa-east-1`** no dropdown de região. Guarde a senha do banco.
+
+Em *Project Settings → Database → Connection string → URI*, copie a string.
+
+### 2. Colocar a URL no `.env` (você)
+
+Adicione ao `.env` local — **não cole a string no chat**:
+
+```
+NEW_DATABASE_URL="postgresql://...@aws-0-sa-east-1.pooler.supabase.com:5432/postgres?connection_limit=1"
+```
+
+### 3. Medir antes de mover
+
+```bash
+npx tsx scripts/migracao-regiao/1-medir-latencia.mts
+```
+
+Compara Canadá e São Paulo nos dois modos do pooler. **Se São Paulo não
+entregar o ganho, pare aqui** — a migração inteira parte dessa premissa, e
+custa dois minutos confirmá-la antes de tocar em qualquer dado.
+
+### 4. Criar o schema no destino
+
+```bash
+DATABASE_URL="$NEW_DATABASE_URL" DIRECT_URL="$NEW_DATABASE_URL" npx prisma migrate deploy
+```
+
+Roda as duas migrations versionadas contra o banco novo. De quebra, prova que
+elas reconstroem o schema do zero.
+
+### 5. Copiar os dados
+
+```bash
+npx tsx scripts/migracao-regiao/2-copiar-dados.mts
+```
+
+Copia preservando os **ids**. Isso não é detalhe: `Shift.unitId` e
+`Shift.userId` apontam para os pais, e o id do usuário é o `sub` do JWT — com
+ids novos, as relações se perdem e todo mundo é deslogado. Os hashes de senha
+vão verbatim, então os logins continuam funcionando.
+
+O script recusa rodar se o destino já tiver dados.
+
+### 6. Conferir
+
+```bash
+npx tsx scripts/migracao-regiao/3-verificar.mts
+```
+
+Compara registro a registro, campo a campo, e confere que as relações resolvem
+para os mesmos registros dos dois lados. **Só troque as variáveis na Vercel
+depois deste passo passar.**
+
+### 7. Trocar as variáveis na Vercel (você)
+
+Em *Settings → Environment Variables*:
+
+- `DATABASE_URL` → a URL nova. Se o passo 3 mostrou o transaction mode viável,
+  use a porta **6543** com `?pgbouncer=true&connection_limit=1`. Senão, **5432**
+  com `?connection_limit=1`.
+- `DIRECT_URL` → a URL nova na porta **5432**, sem parâmetros.
+
+Redeploy.
+
+### 8. Atualizar o `.env` local (você)
+
+Troque `DATABASE_URL` pela nova e remova `NEW_DATABASE_URL`.
+
+---
+
+## Rollback
+
+**Não apague o projeto antigo por alguns dias.** Se algo aparecer depois,
+reverter é trocar as variáveis de volta na Vercel — o banco antigo continua
+intacto, porque a migração só lê dele.
+
+## Janela de indisponibilidade
+
+Entre o passo 5 e o passo 7, o que for escrito no banco antigo não vai para o
+novo. Sendo uso individual, basta não usar o app durante a migração. Se demorar
+ou houver outras pessoas usando, rode o passo 5 novamente com o destino limpo.
