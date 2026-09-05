@@ -9,6 +9,7 @@ import {
 } from "@/lib/dates/calendar-date";
 import { formatCurrency } from "@/lib/format";
 import { listShifts, summarizeShifts } from "@/server/services/shifts";
+import { listUnits } from "@/server/services/units";
 
 export const metadata: Metadata = {
   description: "Calendário mensal dos seus plantões.",
@@ -55,9 +56,10 @@ export default async function AgendaPage({
     year,
   };
 
-  const [shifts, summary] = await Promise.all([
+  const [shifts, summary, units] = await Promise.all([
     listShifts(session.user.id, filters),
     summarizeShifts(session.user.id, filters),
+    listUnits(session.user.id, { onlyActive: true }),
   ]);
 
   return (
@@ -73,6 +75,7 @@ export default async function AgendaPage({
           month={month}
           shifts={shifts}
           today={toDateInputValue(todayAsCalendarDate())}
+          units={units}
           year={year}
         />
       </Suspense>

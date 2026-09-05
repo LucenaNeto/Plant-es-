@@ -48,12 +48,6 @@ export const shiftPayloadSchema = z.object({
    */
   confirmOverlap: checkbox.default(false),
   endTime: timeSchema,
-  /**
-   * Nome de quem assumiu o plantão. Preenchido significa repasse: o valor sai
-   * da receita e passa a somar no total "repassado". Vazio vira `null`, e não
-   * string vazia, para que a regra seja "preenchido ou não" sem casos de borda.
-   */
-  handoffTo: optionalText,
   notes: optionalText,
   paymentStatus: paymentStatusSchema.default("predicted"),
   shiftDate: z.string().trim().regex(ISO_DATE, "Informe a data do plantão."),
@@ -100,3 +94,17 @@ export const recurrenceSchema = z.object({
 });
 
 export type RecurrencePayload = z.infer<typeof recurrenceSchema>;
+
+/**
+ * Repasse, gravado por ação própria e não pelo formulário do plantão.
+ *
+ * Nome vazio desfaz o repasse. A regra é "preenchido ou não" — sem uma terceira
+ * flag que possa discordar do campo.
+ */
+export const handoffSchema = z.object({
+  handoffTo: z
+    .string()
+    .trim()
+    .max(120, "Nome muito longo.")
+    .transform((valor) => valor || null),
+});

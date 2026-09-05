@@ -14,7 +14,9 @@ import {
   PAYMENT_STATUS_STYLES,
   SHIFT_TYPE_LABELS,
 } from "@/lib/shifts/labels";
+import { QuickShiftForm } from "@/features/agenda/quick-shift-form";
 import type { SerializedShift } from "@/lib/shifts/serializer";
+import type { SerializedUnit } from "@/lib/units/serializer";
 
 /**
  * Calendário mensal.
@@ -29,16 +31,19 @@ export function AgendaCalendar({
   month,
   shifts,
   today,
+  units,
   year,
 }: {
   month: number;
   shifts: SerializedShift[];
   /** Hoje no fuso do app, calculado no servidor. "YYYY-MM-DD". */
   today: string;
+  units: SerializedUnit[];
   year: number;
 }) {
   const { applyParams, isPending } = useFilterParams("/agenda");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   const cells = useMemo(() => buildCalendarGrid(year, month), [month, year]);
 
@@ -67,6 +72,7 @@ export function AgendaCalendar({
     // mais na grade, e manter a seleção deixaria o painel de detalhe exibindo
     // um dia que o usuário não está mais vendo.
     setSelectedDate(null);
+    setIsCreating(false);
     applyParams({ month: String(next.month), year: String(next.year) });
   }
 
@@ -110,11 +116,12 @@ export function AgendaCalendar({
                       : "border-zinc-100 bg-stone-50"
                 }`}
                 key={cell.date}
-                onClick={() =>
+                onClick={() => {
+                  setIsCreating(false);
                   setSelectedDate((current) =>
                     current === cell.date ? null : cell.date,
-                  )
-                }
+                  );
+                }}
                 type="button"
               >
                 <span className={isToday && !isSelected ? "font-bold" : "font-medium"}>
@@ -161,19 +168,39 @@ export function AgendaCalendar({
             </h2>
             <button
               className="text-sm font-medium text-teal-700"
-              onClick={() => setSelectedDate(null)}
+              onClick={() => {
+                setSelectedDate(null);
+                setIsCreating(false);
+              }}
               type="button"
             >
               Fechar
             </button>
           </div>
 
+          {isCreating ? (
+            <QuickShiftForm
+              date={selectedDate}
+              onCancel={() => setIsCreating(false)}
+              onCreated={() => {
+                setIsCreating(false);
+                setSelectedDate(null);
+              }}
+              units={units}
+            />
+          ) : (
+            <button
+              className="min-h-12 w-full rounded-md bg-zinc-950 px-4 font-semibold text-white"
+              onClick={() => setIsCreating(true)}
+              type="button"
+            >
+              Lançar plantão neste dia
+            </button>
+          )}
+
           {selectedShifts.length === 0 ? (
             <div className="rounded-lg border border-zinc-200 bg-white p-4 text-sm text-zinc-500">
-              Nenhum plantão neste dia.{" "}
-              <Link className="font-medium text-teal-700" href="/plantoes">
-                Lançar um plantão
-              </Link>
+              Nenhum plantão neste dia.
             </div>
           ) : (
             selectedShifts.map((shift) => (

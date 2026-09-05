@@ -7,6 +7,7 @@ import {
   type ActionResult,
 } from "@/lib/action-result";
 import {
+  handoffSchema,
   paymentStatusUpdateSchema,
   recurrenceSchema,
   shiftPayloadSchema,
@@ -16,6 +17,7 @@ import {
   createShift,
   deleteShift,
   findOverlappingShifts,
+  setHandoff,
   setPaymentStatus,
   updateShift,
   type ShiftServiceError,
@@ -322,6 +324,49 @@ export async function cancelRuleFutureAction(
     return actionOk(
       resultado,
       `${resultado.deleted} plantões futuros removidos. Os passados foram mantidos.`,
+    );
+  });
+}
+
+/**
+ * Marca ou desfaz o repasse de UMA ocorrência.
+ *
+ * Repasse é ação sobre o plantão que já existe, não um tipo escolhido na
+ * criação: o plantão de toda terça segue sendo fixo, e numa terça específica
+ * você o passa adiante. Por isso vive aqui e não em `saveShiftAction` — editar
+ * o valor de um plantão repassado não pode desfazer o repasse sem você pedir.
+ */
+export async function setHandoffAction(
+  shiftId: string,
+  _previousState: ShiftActionResult | null,
+  formData: FormData,
+): Promise<ShiftActionResult> {
+  return runAuthenticatedAction("shift.set_handoff", async ({ logger, userId }) => {
+    const parsed = handoffSchema.safeParse({
+      handoffTo: formData.get("handoffTo") ?? "",
+    });
+
+    if (!parsed.success) {
+      return validationFailure(parsed.error.flatten().fieldErrors);
+    }
+
+    const shift = await setHandoff(userId, shiftId, parsed.data.handoffTo);
+
+    if (!shift) {
+      return actionFail("not_found", "Plantão não encontrado.");
+    }
+
+    logger.info(shift.handoffTo ? "shift.handed_off" : "shift.handoff_undone", {
+      shiftId: shift.id,
+    });
+
+    revalidateShiftViews();
+
+    return actionOk(
+      shift,
+      shift.handoffTo
+        ? `Plantão repassado a ${shift.handoffTo}. O valor saiu da sua receita.`
+        : "Repasse desfeito. O plantão voltou a ser seu.",
     );
   });
 }

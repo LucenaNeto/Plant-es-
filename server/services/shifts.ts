@@ -158,7 +158,6 @@ function buildShiftData(payload: ShiftPayload) {
     // `hours` e a janela de horário — e é `hours` que alimenta os relatórios.
     hours: new Prisma.Decimal(hours),
     endTime: payload.endTime,
-    handoffTo: payload.handoffTo ?? null,
     notes: payload.notes ?? null,
     paymentStatus: payload.paymentStatus,
     shiftDate: parseCalendarDate(payload.shiftDate),
@@ -227,6 +226,40 @@ export async function updateShift(
   });
 
   return { ok: true, shift: serializeShift(shift) };
+}
+
+/**
+ * Marca ou desfaz o repasse de um plantão.
+ *
+ * **Repasse é um acontecimento sobre uma ocorrência, não um tipo de plantão.**
+ * O plantão de toda terça continua sendo fixo; numa terça específica você passa
+ * ele adiante. Por isso o campo é gravado só por aqui, e `updateShift` não o
+ * toca: editar o valor de um plantão repassado não pode desfazer o repasse sem
+ * o usuário pedir.
+ *
+ * `name` nulo desfaz — o plantão volta a ser seu e o valor volta à receita.
+ */
+export async function setHandoff(
+  userId: string,
+  shiftId: string,
+  name: string | null,
+) {
+  const existing = await prisma.shift.findFirst({
+    select: { id: true },
+    where: { id: shiftId, userId },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  const shift = await prisma.shift.update({
+    data: { handoffTo: name?.trim() || null },
+    include: WITH_UNIT_NAME,
+    where: { id: shiftId },
+  });
+
+  return serializeShift(shift);
 }
 
 /**

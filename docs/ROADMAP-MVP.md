@@ -232,6 +232,51 @@ foram conferidas visualmente em viewport de 375px.
 do botão "Estender". Automatizar exige um job agendado (cron da Vercel), que
 não foi incluído para não adicionar infra sem necessidade comprovada.
 
+### ✅ Bloco 9 — `feature/repasse-e-calendario`
+
+- **Correção de design do repasse.** Estava como campo do formulário, visível
+  só no tipo "Repasse" — obrigando a mudar o tipo do plantão. Errado: um
+  plantão fixo de toda terça continua fixo; numa terça específica ele é
+  repassado. Virou ação no card, e `updateShift` não toca mais `handoffTo`,
+  então editar o valor de um plantão repassado não desfaz o repasse.
+- **Lançamento pelo calendário**: tocar num dia abre um formulário curto —
+  unidade, 12 ou 24 horas, hora de início, repetir semanal. O término é
+  calculado. Reaproveita `saveShiftAction`, então o aviso de sobreposição e a
+  validação vêm junto, sem um segundo caminho de criação capaz de divergir.
+
+## Fila de melhorias propostas
+
+Priorizadas a partir do uso real observado em 2026-09-05 (10 plantões,
+**zero gastos lançados**, 8 de 10 ainda em "previsto").
+
+### Fricção — o que os dados mostram que não funciona
+1. **Gasto rápido no card do plantão.** O gasto acontece no plantão; lançar
+   depois exige memória, e o resultado são 0 gastos em 10 plantões.
+2. **Painel de cobrança.** "Já trabalhei e não recebi", ordenado por tempo.
+3. **Marcar recebido em lote.** Hospital paga o mês inteiro de uma vez.
+
+### Decisão — o que o app sabe e não conta
+4. **R$/hora comparado entre unidades.** Nos dados atuais: UPA R$85,33,
+   Santana R$83,33, HRDM R$66,67 — 25% de diferença invisível na interface.
+5. **Custo de deslocamento por unidade.** Três cidades distintas; o líquido
+   por unidade ignora o custo de chegar lá.
+6. **Impostos.** O "líquido" atual ignora IR/ISS/PJ.
+
+### Operação
+7. Renovação automática da recorrência (cron).
+8. Lembrete de plantão (push do PWA).
+9. Cobrir plantão de outra pessoa — o inverso do repasse.
+10. Exportar o mês em CSV/PDF.
+
+### Saúde do projeto
+11. **Testes automatizados em CI.** Hoje são scripts escritos, rodados e
+    apagados a cada bloco. Nada protege contra regressão — e três bugs já
+    foram encontrados só porque alguém foi procurar.
+12. Backup dos dados.
+13. Rate limiting no login e no cadastro.
+14. Banco de homologação separado — o dono do projeto fará quando houver
+    usuários reais.
+
 ## Fora do MVP
 
 - Recuperação de senha por e-mail (exige provedor externo).

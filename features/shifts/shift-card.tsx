@@ -5,6 +5,7 @@ import {
   deleteShiftAction,
   setPaymentStatusAction,
 } from "@/app/(private)/plantoes/actions";
+import { HandoffControl } from "@/features/shifts/handoff-control";
 import { formatCurrency } from "@/lib/format";
 import {
   MODALITY_LABELS,
@@ -81,11 +82,7 @@ export function ShiftCard({
             Repetição
           </span>
         ) : null}
-        {shift.isHandedOff ? (
-          <span className="rounded-md bg-violet-50 px-2.5 py-1 text-violet-800">
-            Repassado a {shift.handoffTo}
-          </span>
-        ) : (
+        {shift.isHandedOff ? null : (
           <span
             className={`rounded-md px-2.5 py-1 ${PAYMENT_STATUS_STYLES[shift.paymentStatus]}`}
           >
@@ -97,6 +94,8 @@ export function ShiftCard({
       {shift.notes ? (
         <p className="mt-3 text-sm text-zinc-500">{shift.notes}</p>
       ) : null}
+
+      <HandoffControl shift={shift} />
 
       {failure ? (
         <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
