@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { unstable_rethrow } from "next/navigation";
 import { auth } from "@/auth";
 import { createRequestId, logger, serializeError } from "@/lib/logger";
 import type { Logger } from "@/lib/logger";
+import { describePrismaError } from "@/server/prisma-error";
 
 /**
  * Equivalente de `runAuthenticatedAction` para Route Handlers.
@@ -38,21 +39,27 @@ export function withApiAuth<TRouteArg = unknown>(
   return async (request: Request, routeArg: TRouteArg): Promise<Response> => {
     const requestId = createRequestId();
     const startedAt = Date.now();
-    const session = await auth();
-    const userId = session?.user?.id;
 
-    if (!userId) {
-      logger.warn("api.unauthorized", { requestId, route: routeName });
-
-      return NextResponse.json(
-        { message: "Não autenticado.", requestId },
-        { status: 401 },
-      );
-    }
-
-    const routeLogger = logger.child({ requestId, route: routeName, userId });
+    let routeLogger = logger.child({ requestId, route: routeName });
 
     try {
+      // Dentro do try pelo mesmo motivo do runner de actions: `auth()` lança
+      // quando o cookie não descriptografa (segredo rotacionado, por exemplo),
+      // e essa falha precisa virar log estruturado, não um 500 mudo.
+      const session = await auth();
+      const userId = session?.user?.id;
+
+      if (!userId) {
+        routeLogger.warn("api.unauthorized");
+
+        return NextResponse.json(
+          { message: "Não autenticado.", requestId },
+          { status: 401 },
+        );
+      }
+
+      routeLogger = routeLogger.child({ userId });
+
       const response = await handler(
         { logger: routeLogger, requestId, userId },
         request,
@@ -66,18 +73,21 @@ export function withApiAuth<TRouteArg = unknown>(
 
       return response;
     } catch (error) {
-      const durationMs = Date.now() - startedAt;
+      unstable_rethrow(error);
 
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      const durationMs = Date.now() - startedAt;
+      const known = describePrismaError(error);
+
+      if (known) {
         routeLogger.warn("api.known_db_error", {
-          code: error.code,
           durationMs,
           error: serializeError(error),
+          status: known.status,
         });
 
         return NextResponse.json(
-          { message: "Não foi possível concluir a operação.", requestId },
-          { status: 409 },
+          { message: known.message, requestId },
+          { status: known.status },
         );
       }
 
@@ -100,4 +110,16 @@ export function validationResponse(
   message = "Revise os campos informados.",
 ) {
   return NextResponse.json({ errors, message }, { status: 400 });
+}
+
+/**
+ * Fábrica, não constante.
+ *
+ * Uma `Response` guarda o corpo num stream de uso único: compartilhar a mesma
+ * instância entre requisições faz a segunda falhar com "Body is unusable", e
+ * como isso acontece durante a serialização — já fora do try acima — vira um
+ * 500 sem log. Cada 404 precisa de um objeto novo.
+ */
+export function notFoundResponse(message: string) {
+  return NextResponse.json({ message }, { status: 404 });
 }

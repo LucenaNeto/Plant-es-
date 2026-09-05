@@ -9,14 +9,24 @@ import { DEFAULT_PRIVATE_REDIRECT } from "@/lib/routes";
  * Aceita apenas caminhos internos como destino pós-login. Sem isto,
  * `?callbackUrl=https://site-falso/` faria o app redirecionar o usuário
  * recém-autenticado para fora — open redirect, usado em phishing.
- * `//evil.com` também é rejeitado: o navegador o trata como URL absoluta.
+ *
+ * Não basta rejeitar `//`. Pela especificação WHATWG, a barra invertida é
+ * equivalente à barra em esquemas especiais, então `/\evil.com` resolve para
+ * `https://evil.com/` — e navegadores ainda descartam tab, CR e LF ao
+ * interpretar a URL, de modo que `/<tab>/evil.com` vira `//evil.com`.
+ *
+ * Por isso: limpar os caracteres descartáveis primeiro e então exigir que a
+ * string comece com uma barra seguida de algo que não seja barra nem
+ * contrabarra. Sobram apenas caminhos genuinamente relativos à raiz.
  */
 function safeCallbackUrl(value: string | null) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+  if (!value) {
     return DEFAULT_PRIVATE_REDIRECT;
   }
 
-  return value;
+  const cleaned = value.replace(/[\t\r\n]/g, "");
+
+  return /^\/[^/\\]/.test(cleaned) ? cleaned : DEFAULT_PRIVATE_REDIRECT;
 }
 
 export function LoginForm() {

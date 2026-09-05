@@ -63,7 +63,14 @@ export const unitPayloadSchema = z.object({
  *
  * Com o schema parcial, campo ausente significa "não mexer".
  */
-export const unitUpdateSchema = unitPayloadSchema.partial();
+export const unitUpdateSchema = unitPayloadSchema.partial().extend({
+  // `.partial()` torna o campo opcional mas NAO remove o `.default(false)` de
+  // `isFixed`: ausente do payload, o Zod ainda entrega `false`. O servico veria
+  // um valor definido e gravaria, desmarcando "unidade fixa" em qualquer PATCH
+  // que nao mencionasse o campo -- exatamente o bug que este schema corrige
+  // para `active`. Trocamos pelo preprocessador que preserva `undefined`.
+  isFixed: optionalBooleanFromForm,
+});
 
 export type UnitPayload = z.infer<typeof unitPayloadSchema>;
 export type UnitUpdatePayload = z.infer<typeof unitUpdateSchema>;

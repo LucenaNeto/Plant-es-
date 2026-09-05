@@ -1,5 +1,4 @@
 import { unstable_rethrow } from "next/navigation";
-import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import {
   actionFail,
@@ -8,6 +7,7 @@ import {
 } from "@/lib/action-result";
 import { createRequestId, logger, serializeError } from "@/lib/logger";
 import type { Logger } from "@/lib/logger";
+import { describePrismaError } from "@/server/prisma-error";
 
 /**
  * Envelope padrão de toda Server Action autenticada.
@@ -37,61 +37,39 @@ type ActionHandler<TData> = (
   context: ActionContext,
 ) => Promise<ActionResult<TData>>;
 
-/**
- * Traduz erros conhecidos do Prisma em falhas com mensagem útil.
- * Retorna `null` quando o erro não é reconhecido, para cair no caminho
- * genérico de "erro inesperado".
- */
-function mapPrismaError(error: unknown, requestId: string) {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
-    return null;
-  }
-
-  if (error.code === "P2002") {
-    return actionFail("conflict", "Já existe um registro com esses dados.", {
-      requestId,
-    });
-  }
-
-  if (error.code === "P2025") {
-    return actionFail("not_found", "Registro não encontrado.", { requestId });
-  }
-
-  if (error.code === "P2003") {
-    return actionFail(
-      "conflict",
-      "Este registro está vinculado a outros e não pode ser alterado.",
-      { requestId },
-    );
-  }
-
-  return null;
-}
-
 export async function runAuthenticatedAction<TData>(
   actionName: string,
   handler: ActionHandler<TData>,
 ): Promise<ActionResult<TData>> {
   const requestId = createRequestId();
   const startedAt = Date.now();
-  const session = await auth();
-  const userId = session?.user?.id;
 
-  if (!userId) {
-    logger.warn("action.unauthorized", { action: actionName, requestId });
-
-    return actionFail(
-      "unauthorized",
-      "Sua sessão expirou. Entre novamente para continuar.",
-      { requestId },
-    );
-  }
-
-  const actionLogger = logger.child({ action: actionName, requestId, userId });
-
-  actionLogger.debug("action.start");
+  // Começa sem `userId` e é reatribuído assim que a sessão resolve, para que o
+  // catch tenha um logger utilizável mesmo quando a falha for na própria
+  // resolução da sessão.
+  let actionLogger = logger.child({ action: actionName, requestId });
 
   try {
+    // `auth()` fica DENTRO do try de propósito: com `AUTH_SECRET` rotacionado,
+    // todo cookie existente falha na descriptografia e esta chamada lança. Se
+    // ela estivesse fora, a exceção contornaria justamente o log e a mensagem
+    // amigável que este envelope existe para garantir.
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    if (!userId) {
+      actionLogger.warn("action.unauthorized");
+
+      return actionFail(
+        "unauthorized",
+        "Sua sessão expirou. Entre novamente para continuar.",
+        { requestId },
+      );
+    }
+
+    actionLogger = actionLogger.child({ userId });
+    actionLogger.debug("action.start");
+
     const result = await handler({
       logger: actionLogger,
       requestId,
@@ -113,16 +91,16 @@ export async function runAuthenticatedAction<TData>(
     unstable_rethrow(error);
 
     const durationMs = Date.now() - startedAt;
-    const mapped = mapPrismaError(error, requestId);
+    const known = describePrismaError(error);
 
-    if (mapped) {
+    if (known) {
       actionLogger.warn("action.known_db_error", {
-        code: mapped.code,
+        code: known.actionCode,
         durationMs,
         error: serializeError(error),
       });
 
-      return mapped;
+      return actionFail(known.actionCode, known.message, { requestId });
     }
 
     actionLogger.error("action.failed", {

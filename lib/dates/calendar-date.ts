@@ -94,13 +94,33 @@ export function getCalendarDay(date: Date): number {
   return date.getUTCDate();
 }
 
-/** Hoje, normalizado para meia-noite UTC — comparável com `shiftDate`. */
-export function todayAsCalendarDate(): Date {
-  const now = new Date();
+/**
+ * Fuso de referência do produto. O app é de uso pessoal, no Brasil, e "hoje"
+ * precisa significar o hoje do usuário — não o do processo que executa o
+ * código.
+ */
+export const APP_TIME_ZONE = "America/Sao_Paulo";
 
-  return new Date(
-    Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()),
-  );
+/**
+ * Hoje, normalizado para meia-noite UTC — comparável com `shiftDate`.
+ *
+ * Ler `getFullYear/getMonth/getDate` daria a data do fuso do **processo**, e na
+ * Vercel o processo roda em UTC: entre 21h e a meia-noite de Brasília o
+ * servidor já está no dia seguinte e um plantão de hoje seria tratado como
+ * passado. Por isso a data sai do `Intl` no fuso do app.
+ *
+ * `en-CA` é usado por produzir exatamente "YYYY-MM-DD", que
+ * `parseCalendarDate` consome sem reordenar nada.
+ */
+export function todayAsCalendarDate(timeZone: string = APP_TIME_ZONE): Date {
+  const isoDate = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone,
+    year: "numeric",
+  }).format(new Date());
+
+  return parseCalendarDate(isoDate);
 }
 
 /**
@@ -148,9 +168,21 @@ export function shiftsOverlap(
     startTime: string;
     endTime: string;
   }) => {
+    const duration = calculateShiftHours(shift.startTime, shift.endTime);
+
+    // Antes havia um `?? 0` aqui. Ele colapsava o intervalo num ponto, e a
+    // função respondia "sem sobreposição" para um plantão que sequer pôde ser
+    // avaliado — um falso negativo silencioso numa checagem de conflito. Falhar
+    // alto é melhor: horário malformado é erro de programação, já que o Zod
+    // valida o formato antes de qualquer coisa chegar aqui.
+    if (duration === null) {
+      throw new Error(
+        `Horário de plantão inválido: ${shift.startTime}-${shift.endTime}`,
+      );
+    }
+
     const dayOffset = Math.floor(shift.date.getTime() / 60000);
     const [startHour, startMinute] = shift.startTime.split(":").map(Number);
-    const duration = calculateShiftHours(shift.startTime, shift.endTime) ?? 0;
     const start = dayOffset + startHour * 60 + startMinute;
 
     return { start, end: start + duration * 60 };

@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { withApiAuth, validationResponse } from "@/server/api-handler";
+import {
+  notFoundResponse,
+  validationResponse,
+  withApiAuth,
+} from "@/server/api-handler";
 import {
   deactivateUnit,
   findUnit,
@@ -9,10 +13,9 @@ import { unitUpdateSchema } from "@/lib/validators/units";
 
 type RouteArg = { params: Promise<{ id: string }> };
 
-const NOT_FOUND = NextResponse.json(
-  { message: "Unidade não encontrada." },
-  { status: 404 },
-);
+// Função, não constante: uma `Response` só pode ter o corpo lido uma vez, e
+// reaproveitar a mesma instância faria o segundo 404 do processo falhar.
+const unitNotFound = () => notFoundResponse("Unidade não encontrada.");
 
 export const GET = withApiAuth<RouteArg>(
   "units.get",
@@ -21,7 +24,7 @@ export const GET = withApiAuth<RouteArg>(
     const unit = await findUnit(userId, id);
 
     if (!unit) {
-      return NOT_FOUND;
+      return unitNotFound();
     }
 
     return NextResponse.json({ unit });
@@ -45,7 +48,7 @@ export const PATCH = withApiAuth<RouteArg>(
     const unit = await updateUnit(userId, id, parsedBody.data);
 
     if (!unit) {
-      return NOT_FOUND;
+      return unitNotFound();
     }
 
     logger.info("unit.updated", {
@@ -64,7 +67,7 @@ export const DELETE = withApiAuth<RouteArg>(
     const unit = await deactivateUnit(userId, id);
 
     if (!unit) {
-      return NOT_FOUND;
+      return unitNotFound();
     }
 
     logger.info("unit.deactivated", { unitId: unit.id });

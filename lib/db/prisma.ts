@@ -1,12 +1,40 @@
 import { PrismaClient } from "@prisma/client";
 import { logger, serializeError } from "@/lib/logger";
 
+const DEFAULT_SLOW_QUERY_MS = 500;
+
 /**
  * Limite acima do qual uma consulta é considerada lenta e vira `warn`.
  * O plano gratuito de Postgres serverless costuma ter latência de rede alta,
  * então o alvo aqui é pegar N+1 e falta de índice, não microssegundos.
+ *
+ * A validação existe porque `Number("500ms")` é `NaN` e toda comparação com
+ * `NaN` é falsa: um valor mal digitado no painel da Vercel desligaria a
+ * detecção inteira em silêncio, e o time concluiria que não há consulta lenta
+ * quando na verdade o detector estaria morto.
  */
-const SLOW_QUERY_MS = Number(process.env.SLOW_QUERY_MS ?? 500);
+function resolveSlowQueryMs() {
+  const raw = process.env.SLOW_QUERY_MS;
+
+  if (!raw) {
+    return DEFAULT_SLOW_QUERY_MS;
+  }
+
+  const parsed = Number(raw);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    logger.warn("config.invalid_slow_query_ms", {
+      fallback: DEFAULT_SLOW_QUERY_MS,
+      received: raw,
+    });
+
+    return DEFAULT_SLOW_QUERY_MS;
+  }
+
+  return parsed;
+}
+
+const SLOW_QUERY_MS = resolveSlowQueryMs();
 
 function createPrismaClient() {
   const client = new PrismaClient({
