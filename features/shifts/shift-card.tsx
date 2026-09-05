@@ -76,6 +76,11 @@ export function ShiftCard({
         <span className="rounded-md bg-zinc-100 px-2.5 py-1 text-zinc-700">
           {SHIFT_TYPE_LABELS[shift.shiftType]}
         </span>
+        {shift.isRecurring ? (
+          <span className="rounded-md bg-sky-50 px-2.5 py-1 text-sky-800">
+            Repetição
+          </span>
+        ) : null}
         {shift.isHandedOff ? (
           <span className="rounded-md bg-violet-50 px-2.5 py-1 text-violet-800">
             Repassado a {shift.handoffTo}

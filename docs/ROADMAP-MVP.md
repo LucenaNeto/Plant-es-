@@ -197,6 +197,41 @@ foram conferidas visualmente em viewport de 375px.
 - **Rotacionar `AUTH_SECRET`** se o transcrito da sessão de 2026-09-05 não for
   considerado privado: ele foi impresso por engano em um comando de conferência.
 
+## Depois do MVP (blocos 6 a 8)
+
+### ✅ Bloco 6 — `feature/repasse-e-consolidacao`
+
+- Campo `handoffTo`: plantão passado a outra pessoa sai da receita e soma
+  em "repassado", visível à parte. As horas saem junto.
+- `getMonthlyFinance` foi de seis `groupBy` para duas consultas, agregando
+  em memória. Justificado pela escala (~30 plantões/mês) e pelo
+  `connection_limit=1`, que impede paralelismo.
+- Corrigido bug do Bloco 4: gasto de unidade sem plantão no mês não era
+  atribuído nem geral, inflando "gastos gerais" em silêncio.
+
+### ✅ Bloco 7 — `feature/home-cronograma`
+
+- Home orientada ao cronograma: próximo plantão, faixa da semana,
+  próximos, financeiro fechando a tela.
+- `getScheduleWindow` cobre semana e próximos numa consulta só.
+- Dashboard de 8 para 4 consultas: 477ms → 350ms medidos.
+
+### ✅ Bloco 8 — `feature/plantoes-recorrentes`
+
+- A pergunta "repetir toda semana?" aparece no formulário quando o tipo é
+  Fixo, com o dia da data já marcado.
+- **Ocorrências são plantões de verdade**, não virtuais. Editar, mover ou
+  excluir uma não afeta as outras — sem o "editar só este / este e os
+  futuros / todos" que atormenta app de calendário.
+- Geração idempotente: "Estender" apertado duas vezes não duplica nada.
+- Três ações distintas porque são intenções distintas: estender, parar de
+  repetir (mantém o lançado) e cancelar futuros (preserva o passado).
+- Apagar a regra não apaga os plantões (`onDelete: SetNull`).
+
+**Limitação conhecida:** a renovação dos 3 meses não é automática — depende
+do botão "Estender". Automatizar exige um job agendado (cron da Vercel), que
+não foi incluído para não adicionar infra sem necessidade comprovada.
+
 ## Fora do MVP
 
 - Recuperação de senha por e-mail (exige provedor externo).

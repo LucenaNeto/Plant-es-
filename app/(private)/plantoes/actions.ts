@@ -8,6 +8,7 @@ import {
 } from "@/lib/action-result";
 import {
   paymentStatusUpdateSchema,
+  recurrenceSchema,
   shiftPayloadSchema,
 } from "@/lib/validators/shifts";
 import type { SerializedShift } from "@/lib/shifts/serializer";
@@ -19,6 +20,12 @@ import {
   updateShift,
   type ShiftServiceError,
 } from "@/server/services/shifts";
+import {
+  cancelFutureShifts,
+  createRuleFromShift,
+  deactivateRule,
+  generateShifts,
+} from "@/server/services/recurring-rules";
 import {
   runAuthenticatedAction,
   validationFailure,
@@ -85,6 +92,16 @@ export async function saveShiftAction(
         return validationFailure(parsed.error.flatten().fieldErrors);
       }
 
+      /**
+       * `Object.fromEntries` guarda só o último valor de um campo repetido, e
+       * os dias da semana são vários checkboxes com o mesmo `name`. Sem o
+       * `getAll` a regra sairia sempre com um único dia — o último marcado.
+       */
+      const recurrence = recurrenceSchema.safeParse({
+        repeatWeekdays: formData.getAll("repeatWeekdays"),
+        repeatWeekly: formData.get("repeatWeekly"),
+      });
+
       const { confirmOverlap, ...payload } = parsed.data;
 
       // Sobreposição é aviso, não bloqueio: o usuário é dono da própria agenda
@@ -127,11 +144,45 @@ export async function saveShiftAction(
         unitId: shift.unitId,
       });
 
+      /**
+       * A regra só é criada junto de um plantão **novo**. Numa edição, oferecer
+       * recorrência criaria uma segunda série a partir de um plantão que já
+       * pode pertencer a outra — e o usuário não teria como perceber.
+       */
+      let recurrenceMessage = "";
+
+      if (
+        !shiftId &&
+        recurrence.success &&
+        recurrence.data.repeatWeekly &&
+        recurrence.data.repeatWeekdays.length > 0
+      ) {
+        const rule = await createRuleFromShift(
+          userId,
+          { ...payload, confirmOverlap },
+          recurrence.data.repeatWeekdays,
+        );
+
+        if (rule) {
+          const gerados = await generateShifts(userId, rule.id);
+
+          logger.info("recurring_rule.created", {
+            generated: gerados?.created ?? 0,
+            ruleId: rule.id,
+            weekdays: recurrence.data.repeatWeekdays,
+          });
+
+          recurrenceMessage = gerados
+            ? ` ${gerados.created} plantões criados até ${gerados.through}.`
+            : "";
+        }
+      }
+
       revalidateShiftViews();
 
       return actionOk(
         shift,
-        shiftId ? "Plantão atualizado." : "Plantão criado.",
+        (shiftId ? "Plantão atualizado." : "Plantão criado.") + recurrenceMessage,
       );
     },
   );
@@ -191,5 +242,86 @@ export async function deleteShiftAction(
     revalidateShiftViews();
 
     return actionOk(deleted, "Plantão excluído.");
+  });
+}
+
+export async function extendRuleAction(
+  ruleId: string,
+  _previousState: ActionResult<{ created: number }> | null,
+): Promise<ActionResult<{ created: number }>> {
+  return runAuthenticatedAction("recurring_rule.extend", async ({
+    logger,
+    userId,
+  }) => {
+    const resultado = await generateShifts(userId, ruleId);
+
+    if (!resultado) {
+      return actionFail("not_found", "Regra não encontrada ou já desativada.");
+    }
+
+    logger.info("recurring_rule.extended", {
+      created: resultado.created,
+      ruleId,
+    });
+
+    revalidateShiftViews();
+
+    return actionOk(
+      { created: resultado.created },
+      resultado.created > 0
+        ? `${resultado.created} plantões criados até ${resultado.through}.`
+        : `Nada a criar — a agenda já está completa até ${resultado.through}.`,
+    );
+  });
+}
+
+export async function deactivateRuleAction(
+  ruleId: string,
+  _previousState: ActionResult<{ id: string }> | null,
+): Promise<ActionResult<{ id: string }>> {
+  return runAuthenticatedAction("recurring_rule.deactivate", async ({
+    logger,
+    userId,
+  }) => {
+    const resultado = await deactivateRule(userId, ruleId);
+
+    if (!resultado) {
+      return actionFail("not_found", "Regra não encontrada.");
+    }
+
+    logger.info("recurring_rule.deactivated", { ruleId });
+    revalidateShiftViews();
+
+    return actionOk(
+      resultado,
+      "Repetição desativada. Os plantões já lançados continuam na agenda.",
+    );
+  });
+}
+
+export async function cancelRuleFutureAction(
+  ruleId: string,
+  _previousState: ActionResult<{ deleted: number }> | null,
+): Promise<ActionResult<{ deleted: number }>> {
+  return runAuthenticatedAction("recurring_rule.cancel_future", async ({
+    logger,
+    userId,
+  }) => {
+    const resultado = await cancelFutureShifts(userId, ruleId);
+
+    if (!resultado) {
+      return actionFail("not_found", "Regra não encontrada.");
+    }
+
+    logger.info("recurring_rule.future_cancelled", {
+      deleted: resultado.deleted,
+      ruleId,
+    });
+    revalidateShiftViews();
+
+    return actionOk(
+      resultado,
+      `${resultado.deleted} plantões futuros removidos. Os passados foram mantidos.`,
+    );
   });
 }

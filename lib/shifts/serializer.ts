@@ -32,6 +32,8 @@ export function serializeShift(shift: Shift & { unit: Pick<Unit, "name"> }) {
     id: shift.id,
     notes: shift.notes,
     paymentStatus: shift.paymentStatus,
+    /** Veio de uma regra de repetição? Só para exibir a origem no card. */
+    isRecurring: shift.recurringRuleId !== null,
     shiftDate: toDateInputValue(shift.shiftDate),
     shiftType: shift.shiftType,
     startTime: shift.startTime,

@@ -3,11 +3,13 @@ import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/ui/stat-card";
 import { ShiftFilters } from "@/features/shifts/shift-filters";
+import { RecurringRulesPanel } from "@/features/shifts/recurring-rules-panel";
 import { ShiftManagement } from "@/features/shifts/shift-management";
 import { requireSession } from "@/lib/auth/session";
 import { todayAsCalendarDate } from "@/lib/dates/calendar-date";
 import { formatCurrency } from "@/lib/format";
 import { shiftFiltersSchema } from "@/lib/validators/shifts";
+import { listRules } from "@/server/services/recurring-rules";
 import { listShifts, summarizeShifts } from "@/server/services/shifts";
 import { listUnits } from "@/server/services/units";
 
@@ -59,10 +61,11 @@ export default async function PlantoesPage({
   const session = await requireSession();
   const filters = resolveFilters(await searchParams);
 
-  const [shifts, units, summary] = await Promise.all([
+  const [shifts, units, summary, rules] = await Promise.all([
     listShifts(session.user.id, filters),
     listUnits(session.user.id),
     summarizeShifts(session.user.id, filters),
+    listRules(session.user.id),
   ]);
 
   return (
@@ -113,6 +116,8 @@ export default async function PlantoesPage({
       ) : null}
 
       <ShiftManagement shifts={shifts} units={units} />
+
+      <RecurringRulesPanel rules={rules} />
     </div>
   );
 }

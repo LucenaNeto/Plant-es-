@@ -2,7 +2,11 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { saveShiftAction } from "@/app/(private)/plantoes/actions";
-import { addHoursToTime, calculateShiftHours } from "@/lib/dates/calendar-date";
+import {
+  addHoursToTime,
+  calculateShiftHours,
+  WEEKDAY_LABELS,
+} from "@/lib/dates/calendar-date";
 import { formatCurrency } from "@/lib/format";
 import {
   MODALITY_LABELS,
@@ -59,6 +63,35 @@ export function ShiftForm({
 }) {
   const isDuplicate = Boolean(shift) && shiftId === null;
   const [values, setValues] = useState(() => initialValues(shift, isDuplicate));
+  const [repeatWeekly, setRepeatWeekly] = useState(false);
+  const [repeatWeekdays, setRepeatWeekdays] = useState<number[]>([]);
+
+  /**
+   * Dia da semana da data escolhida, para já vir marcado. Lido em UTC porque
+   * `shiftDate` é data de calendário — com `getDay()` local, uma data digitada
+   * à noite marcaria o dia errado.
+   */
+  const weekdayOfDate =
+    values.shiftDate.length === 10
+      ? new Date(`${values.shiftDate}T00:00:00.000Z`).getUTCDay()
+      : null;
+
+  const selectedWeekdays =
+    repeatWeekdays.length > 0
+      ? repeatWeekdays
+      : weekdayOfDate !== null
+        ? [weekdayOfDate]
+        : [];
+
+  function toggleWeekday(dia: number) {
+    setRepeatWeekdays((atual) => {
+      const base = atual.length > 0 ? atual : selectedWeekdays;
+
+      return base.includes(dia)
+        ? base.filter((d) => d !== dia)
+        : [...base, dia].sort((a, b) => a - b);
+    });
+  }
 
   const [state, formAction, isPending] = useActionState(
     saveShiftAction.bind(null, shiftId),
@@ -341,6 +374,68 @@ export function ShiftForm({
               : "Deixe em branco se o plantão continua sendo seu — o valor segue contando na receita."}
           </p>
         </div>
+      ) : null}
+
+      {/*
+        A recorrência é oferecida só no tipo "Fixo" e só ao criar. Num plantão
+        que já existe, criar uma série a partir dele geraria uma segunda
+        recorrência sobre um plantão que talvez já pertença a outra — e o
+        usuário não teria como notar.
+      */}
+      {values.shiftType === "fixed" && shiftId === null ? (
+        <fieldset className="rounded-md border border-zinc-200 p-3">
+          <label className="flex items-center gap-3">
+            <input
+              checked={repeatWeekly}
+              className="h-5 w-5 accent-teal-600"
+              name="repeatWeekly"
+              onChange={(event) => setRepeatWeekly(event.target.checked)}
+              type="checkbox"
+            />
+            <span className="text-sm font-medium text-zinc-700">
+              Repetir toda semana
+            </span>
+          </label>
+
+          {repeatWeekly ? (
+            <div className="mt-3">
+              <p className="mb-2 text-sm text-zinc-600">
+                Em quais dias da semana?
+              </p>
+              <div className="grid grid-cols-7 gap-1.5">
+                {WEEKDAY_LABELS.map((rotulo, dia) => {
+                  const ativo = selectedWeekdays.includes(dia);
+
+                  return (
+                    <label
+                      className={`flex min-h-11 cursor-pointer items-center justify-center rounded-md border text-xs font-medium capitalize ${
+                        ativo
+                          ? "border-teal-600 bg-teal-600 text-white"
+                          : "border-zinc-200 text-zinc-600"
+                      }`}
+                      key={rotulo}
+                    >
+                      <input
+                        checked={ativo}
+                        className="sr-only"
+                        name="repeatWeekdays"
+                        onChange={() => toggleWeekday(dia)}
+                        type="checkbox"
+                        value={dia}
+                      />
+                      {rotulo}
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-sm text-zinc-500">
+                {selectedWeekdays.length === 0
+                  ? "Escolha ao menos um dia."
+                  : "Os plantões dos próximos 3 meses são criados agora. Cada um pode ser editado, movido ou excluído depois, sem afetar os outros."}
+              </p>
+            </div>
+          ) : null}
+        </fieldset>
       ) : null}
 
       <div>

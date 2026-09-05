@@ -78,3 +78,25 @@ export const shiftFiltersSchema = z.object({
 });
 
 export type ShiftFilters = z.infer<typeof shiftFiltersSchema>;
+
+/**
+ * Recorrência semanal, oferecida junto do lançamento de um plantão fixo.
+ *
+ * Fica no mesmo formulário de propósito: a pergunta "isso se repete toda
+ * semana?" só faz sentido no momento em que a pessoa acabou de descrever o
+ * plantão. Uma tela separada de "regras" exigiria redigitar tudo.
+ */
+export const recurrenceSchema = z.object({
+  repeatWeekly: checkbox.default(false),
+  /**
+   * Dias da semana, 0 = domingo — a mesma convenção de `Date.getUTCDay()` e da
+   * grade do calendário. Manter um único sistema evita o bug clássico de a
+   * regra gerar plantão na segunda quando o usuário pediu domingo.
+   */
+  repeatWeekdays: z.preprocess(
+    (value) => (Array.isArray(value) ? value : value == null ? [] : [value]),
+    z.array(z.coerce.number().int().min(0).max(6)).default([]),
+  ),
+});
+
+export type RecurrencePayload = z.infer<typeof recurrenceSchema>;
