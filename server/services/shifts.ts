@@ -4,8 +4,12 @@ import {
   calculateShiftHours,
   monthRange,
   parseCalendarDate,
+  relativeDayLabel,
   shiftsOverlap,
+  toDateInputValue,
   todayAsCalendarDate,
+  weekDays,
+  weekRange,
 } from "@/lib/dates/calendar-date";
 import { serializeShift, type SerializedShift } from "@/lib/shifts/serializer";
 import type { ShiftFilters, ShiftPayload } from "@/lib/validators/shifts";
@@ -267,6 +271,61 @@ export async function setPaymentStatus(
 
   return serializeShift(shift);
 }
+
+/**
+ * Janela de agenda da tela inicial: a semana corrente e os próximos plantões.
+ *
+ * **Uma consulta, não duas.** A faixa da semana precisa dos dias já passados
+ * desta semana (para mostrar o que você já cumpriu) e a lista dos próximos
+ * precisa do futuro. Em vez de duas consultas, busca o intervalo que contém as
+ * duas — do domingo desta semana até 45 dias à frente — e separa em memória.
+ * Com `connection_limit=1` (ver CLAUDE.md) consultas não paralelizam, então
+ * cada uma economizada é uma ida ao banco a menos.
+ *
+ * 45 dias cobre com folga os 4 próximos plantões de quem trabalha semanalmente,
+ * sem trazer meses de agenda que a tela não exibe.
+ */
+export async function getScheduleWindow(userId: string, upcomingLimit = 4) {
+  const today = todayAsCalendarDate();
+  const { start: weekStart, end: weekEnd } = weekRange(today);
+  const horizonte = new Date(today.getTime() + 45 * 86400000);
+
+  const shifts = await prisma.shift.findMany({
+    include: WITH_UNIT_NAME,
+    orderBy: [{ shiftDate: "asc" }, { startTime: "asc" }],
+    where: {
+      shiftDate: { gte: weekStart, lte: horizonte },
+      userId,
+    },
+  });
+
+  const serializados = shifts.map((shift) => ({
+    ...serializeShift(shift),
+    // O rótulo relativo sai daqui, e não do cliente, porque depende de "hoje"
+    // no fuso do app — que só o servidor calcula corretamente.
+    relativeLabel: relativeDayLabel(shift.shiftDate, today),
+  }));
+
+  const inicioSemana = toDateInputValue(weekStart);
+  const fimSemana = toDateInputValue(weekEnd);
+  const hoje = toDateInputValue(today);
+
+  return {
+    today: hoje,
+    week: weekDays(today).map((dia) => ({
+      ...dia,
+      isToday: dia.date === hoje,
+      isPast: dia.date < hoje,
+      shifts: serializados.filter((plantao) => plantao.shiftDate === dia.date),
+    })),
+    upcoming: serializados
+      .filter((plantao) => plantao.shiftDate >= hoje)
+      .slice(0, upcomingLimit),
+    weekWindow: { start: inicioSemana, end: fimSemana },
+  };
+}
+
+export type ScheduleWindow = Awaited<ReturnType<typeof getScheduleWindow>>;
 
 /**
  * Próximo plantão a partir de hoje, para o destaque do dashboard.

@@ -281,3 +281,46 @@ export function shiftsOverlap(
 
   return rangeA.start < rangeB.end && rangeB.start < rangeA.end;
 }
+
+/**
+ * Intervalo `[início, fim)` da semana que contém a data, começando no domingo —
+ * a mesma convenção da grade do calendário, para que a faixa da semana na tela
+ * inicial e o mês na agenda nunca discordem sobre onde a semana começa.
+ */
+export function weekRange(date: Date) {
+  const start = new Date(date.getTime() - date.getUTCDay() * 86400000);
+
+  return { start, end: new Date(start.getTime() + 7 * 86400000) };
+}
+
+/** Dias inteiros entre duas datas de calendário. Negativo para passado. */
+export function daysBetween(from: Date, to: Date) {
+  return Math.round((to.getTime() - from.getTime()) / 86400000);
+}
+
+/**
+ * "hoje", "amanhã", "em 3 dias" — a distância importa mais que a data quando o
+ * plantão está próximo. Passada uma semana, o dia da semana volta a ser mais
+ * informativo que a contagem, e o chamador usa o rótulo de data normal.
+ */
+export function relativeDayLabel(target: Date, today: Date): string | null {
+  const dias = daysBetween(today, target);
+
+  if (dias < 0) return null;
+  if (dias === 0) return "hoje";
+  if (dias === 1) return "amanhã";
+  if (dias <= 6) return `em ${dias} dias`;
+
+  return null;
+}
+
+/** Sequência de sete dias a partir do domingo da semana da data. */
+export function weekDays(date: Date) {
+  const { start } = weekRange(date);
+
+  return Array.from({ length: 7 }, (_, indice) => {
+    const dia = new Date(start.getTime() + indice * 86400000);
+
+    return { date: toDateInputValue(dia), day: dia.getUTCDate(), weekday: indice };
+  });
+}
