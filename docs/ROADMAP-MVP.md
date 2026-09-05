@@ -10,7 +10,7 @@ Um bloco por branch. Nada é mesclado no `main` sem revisão e autorização.
 | Unidades | CRUD via REST | CRUD via REST + camada de serviço |
 | Plantões | 100% mock | **CRUD completo, Server Actions** |
 | Agenda | 100% mock | 100% mock |
-| Gastos | 100% mock | 100% mock |
+| Gastos | 100% mock | **CRUD completo, Server Actions** |
 | Finanças | 100% mock | 100% mock |
 | Dashboard | 100% mock | 100% mock |
 | Recuperar senha | Decorativo | Decorativo (fora do MVP) |
@@ -73,9 +73,27 @@ limites do mês (30/09 dentro, 01/10 fora), soma do resumo, e **sete
 asserções de isolamento entre contas** — listar, ler, editar, excluir,
 mudar pagamento, vincular unidade alheia e detectar conflito.
 
-### Bloco 2 — `feature/gastos-crud`
+### ✅ Bloco 2 — `feature/gastos-crud`
 
 Gastos gerais e vinculados a unidade ou plantão, por categoria.
+
+- Vínculo em três modos explícitos (`linkType`: geral / unidade / plantão),
+  em vez de inferir pela presença de `unitId`/`shiftId` — o campo explícito
+  torna impossível o estado ambíguo com os dois preenchidos.
+- **A unidade de um gasto de plantão é derivada do plantão**, nunca aceita
+  do cliente. Sem isso daria para gravar um gasto apontando ao plantão do
+  Hospital A e à unidade B, e o relatório por unidade do Bloco 4 sairia
+  errado sem nenhum sinal.
+- Resumo do mês com quebra por categoria e barra proporcional, ordenado do
+  maior gasto para o menor.
+- `MonthNavigator` e `useFilterParams` extraídos e já compartilhados com
+  plantões; agenda e finanças reusam nos próximos blocos.
+
+Verificado contra o banco real com 34 asserções: quatro de integridade do
+vínculo (incluindo payload forjado com unidade divergente do plantão), seis
+de isolamento entre contas, e a confirmação de que excluir um plantão **não**
+leva o gasto junto — `shiftId` vira null por `onDelete: SetNull` e o gasto
+permanece vinculado à unidade.
 
 ### Bloco 3 — `feature/agenda-real`
 

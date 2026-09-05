@@ -10,3 +10,12 @@ export const unitTypeSchema = z.enum([
   "maternity",
   "other",
 ]);
+
+export const expenseCategorySchema = z.enum([
+  "fuel",
+  "food",
+  "transport",
+  "parking",
+  "lodging",
+  "other",
+]);
