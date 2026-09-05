@@ -170,11 +170,26 @@ foram conferidas visualmente em viewport de 375px.
 
 ## Melhorias anotadas (pós-MVP)
 
-- **Região do banco.** O Supabase está em `ca-central-1` (Canadá).
-  Consultas quentes medem ~123ms constantes a partir do Brasil; a
-  primeira conexão chegou a 1269ms. Migrar para `sa-east-1` (São Paulo)
-  cortaria cerca de 100ms por consulta. Exige recriar o projeto e mover
-  os dados — mais barato agora, com poucos dados, do que depois.
+- **Região do banco — virou prioridade, não conforto.** O Supabase está em
+  `ca-central-1` (Canadá), e a distância é a causa raiz de dois problemas
+  medidos em 2026-09-05:
+
+  | Configuração | 1 consulta | `Promise.all` de 3 |
+  |---|---|---|
+  | Session 5432, `limit=1` *(atual)* | 131ms | 819ms |
+  | Session 5432, `limit=3` | — | 1471ms |
+  | Transaction 6543, `limit=1` | 784ms | 2273ms |
+
+  Transaction mode (6543) é o correto para serverless, porque devolve a
+  conexão ao pool a cada transação — mas faz mais idas e voltas, e a
+  ~120ms de RTT cada uma, fica 5x mais lento. Aumentar `connection_limit`
+  também piora: cada conexão nova custa um handshake transatlântico maior
+  que o ganho de paralelizar.
+
+  Com o banco em `sa-east-1` (~10–20ms de RTT), transaction mode passaria a
+  custar talvez 60–100ms — resolvendo escala e velocidade juntos. Exige
+  recriar o projeto Supabase e mover os dados; com 4 unidades e 10 plantões,
+  agora é o momento mais barato.
 - **`.gitattributes`** com `* text=auto eol=lf`, para silenciar o aviso
   de CRLF do Git em ambiente Windows com deploy Linux.
 

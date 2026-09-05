@@ -4,7 +4,14 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Conexao poolada (transaction mode, porta 6543). E o que a aplicacao usa em
+  // toda requisicao: a conexao volta ao pool ao fim de cada transacao, entao
+  // varias instancias serverless compartilham o mesmo punhado de conexoes.
+  url       = env("DATABASE_URL")
+  // Conexao direta (session mode, porta 5432). Migrations precisam de uma
+  // sessao dedicada para rodar DDL e travar o schema, o que o pooler em
+  // transaction mode nao oferece.
+  directUrl = env("DIRECT_URL")
 }
 
 enum UnitType {

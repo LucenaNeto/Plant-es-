@@ -9,6 +9,12 @@
 - O `.env` aponta para o **Supabase de produção**. Nenhum comando que escreva no banco
   (`prisma migrate deploy`, `prisma db push`, `prisma migrate reset`) deve ser executado
   automaticamente. Escrever o arquivo de migration é permitido; aplicá-lo não.
+- **`connection_limit=1` na `DATABASE_URL` não é opcional.** O padrão do Prisma é
+  (núcleos × 2 + 1) conexões por processo — 17 numa máquina de 8 núcleos — contra um
+  pool de 15 no Supabase em session mode. Sem o limite, um único `npm run dev` esgota
+  o pool e derruba produção junto (`FATAL (EMAXCONNSESSION)`). Já aconteceu.
+- Scripts de verificação abrem conexão: rode um de cada vez, sempre com
+  `$disconnect()` em `finally`, e encerre servidores locais antes.
 
 ## Camadas
 
