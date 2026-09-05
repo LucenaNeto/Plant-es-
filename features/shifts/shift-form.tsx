@@ -31,6 +31,7 @@ function initialValues(shift: SerializedShift | undefined, isDuplicate: boolean)
   return {
     category: shift?.category ?? "green",
     endTime: shift?.endTime ?? "",
+    handoffTo: shift?.handoffTo ?? "",
     notes: shift?.notes ?? "",
     paymentStatus: shift?.paymentStatus ?? "predicted",
     shiftDate: isDuplicate ? "" : (shift?.shiftDate ?? ""),
@@ -256,7 +257,17 @@ export function ShiftForm({
             className={inputClass}
             id="shiftType"
             name="shiftType"
-            onChange={(event) => update("shiftType", event.target.value)}
+            onChange={(event) =>
+              setValues((current) => ({
+                ...current,
+                // Sair de "Repasse" limpa o nome. Um handoffTo esquecido num
+                // plantão que voltou a ser seu tiraria o valor da receita sem
+                // nenhum sinal na tela.
+                handoffTo:
+                  event.target.value === "handoff" ? current.handoffTo : "",
+                shiftType: event.target.value as typeof current.shiftType,
+              }))
+            }
             value={values.shiftType}
           >
             {SHIFT_TYPE_OPTIONS.map((option) => (
@@ -304,6 +315,33 @@ export function ShiftForm({
           ))}
         </select>
       </div>
+
+      {/*
+        O campo só aparece no tipo "Repasse" porque é ali que ele faz sentido —
+        e o texto de apoio precisa dizer o efeito no dinheiro, senão o usuário
+        preenche o nome e depois estranha o valor ter sumido do previsto.
+      */}
+      {values.shiftType === "handoff" ? (
+        <div>
+          <label className={labelClass} htmlFor="handoffTo">
+            Quem assumiu o plantão
+          </label>
+          <input
+            className={inputClass}
+            id="handoffTo"
+            name="handoffTo"
+            onChange={(event) => update("handoffTo", event.target.value)}
+            placeholder="Nome de quem ficou com o plantão"
+            value={values.handoffTo}
+          />
+          <FieldErrors messages={errors.handoffTo} />
+          <p className="mt-1.5 text-sm text-zinc-500">
+            {values.handoffTo.trim()
+              ? "Com o nome preenchido, o valor sai da sua receita e passa a somar em “Repassado”."
+              : "Deixe em branco se o plantão continua sendo seu — o valor segue contando na receita."}
+          </p>
+        </div>
+      ) : null}
 
       <div>
         <label className={labelClass} htmlFor="notes">

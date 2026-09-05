@@ -76,11 +76,17 @@ export function ShiftCard({
         <span className="rounded-md bg-zinc-100 px-2.5 py-1 text-zinc-700">
           {SHIFT_TYPE_LABELS[shift.shiftType]}
         </span>
-        <span
-          className={`rounded-md px-2.5 py-1 ${PAYMENT_STATUS_STYLES[shift.paymentStatus]}`}
-        >
-          {PAYMENT_STATUS_LABELS[shift.paymentStatus]}
-        </span>
+        {shift.isHandedOff ? (
+          <span className="rounded-md bg-violet-50 px-2.5 py-1 text-violet-800">
+            Repassado a {shift.handoffTo}
+          </span>
+        ) : (
+          <span
+            className={`rounded-md px-2.5 py-1 ${PAYMENT_STATUS_STYLES[shift.paymentStatus]}`}
+          >
+            {PAYMENT_STATUS_LABELS[shift.paymentStatus]}
+          </span>
+        )}
       </div>
 
       {shift.notes ? (
@@ -130,7 +136,16 @@ export function ShiftCard({
           </button>
         </form>
 
-        {next ? (
+        {/*
+          Plantão repassado não tem ciclo de recebimento: o dinheiro é de quem
+          assumiu. Oferecer "marcar recebido" aqui convidaria a um registro que
+          o resumo financeiro ignoraria de qualquer forma.
+        */}
+        {shift.isHandedOff ? (
+          <span className="flex min-h-10 items-center justify-center rounded-md bg-violet-50 px-2 text-center text-xs font-semibold text-violet-800">
+            Fora da receita
+          </span>
+        ) : next ? (
           <form action={statusAction}>
             <input name="paymentStatus" type="hidden" value={next.value} />
             <button

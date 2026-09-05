@@ -154,6 +154,7 @@ function buildShiftData(payload: ShiftPayload) {
     // `hours` e a janela de horário — e é `hours` que alimenta os relatórios.
     hours: new Prisma.Decimal(hours),
     endTime: payload.endTime,
+    handoffTo: payload.handoffTo ?? null,
     notes: payload.notes ?? null,
     paymentStatus: payload.paymentStatus,
     shiftDate: parseCalendarDate(payload.shiftDate),
@@ -287,14 +288,20 @@ export async function findNextShift(userId: string) {
   return shift ? serializeShift(shift) : null;
 }
 
-/** Totais do mês filtrado, para o cabeçalho da lista. */
+/**
+ * Totais do mês filtrado, para o cabeçalho da lista.
+ *
+ * Plantões repassados ficam **fora** dos totais de previsto, pendente e
+ * recebido, e aparecem em `handedOff`. É a mesma regra de
+ * `getMonthlyFinance` — se os dois lugares divergissem, o usuário veria
+ * números diferentes para o mesmo mês em telas vizinhas e não saberia em qual
+ * acreditar.
+ */
 export async function summarizeShifts(userId: string, filters: ShiftFilters) {
   const { start, end } = monthRange(filters.year, filters.month);
 
-  const grouped = await prisma.shift.groupBy({
-    _count: { _all: true },
-    _sum: { hours: true, value: true },
-    by: ["paymentStatus"],
+  const shifts = await prisma.shift.findMany({
+    select: { handoffTo: true, hours: true, paymentStatus: true, value: true },
     where: {
       shiftDate: { gte: start, lt: end },
       userId,
@@ -303,24 +310,34 @@ export async function summarizeShifts(userId: string, filters: ShiftFilters) {
   });
 
   const empty = { count: 0, hours: 0, value: 0 };
-  const summary: Record<PaymentStatus | "total", typeof empty> = {
+  const summary: Record<PaymentStatus | "total" | "handedOff", typeof empty> = {
+    handedOff: { ...empty },
     pending: { ...empty },
     predicted: { ...empty },
     received: { ...empty },
     total: { ...empty },
   };
 
-  for (const row of grouped) {
-    const entry = {
-      count: row._count._all,
-      hours: row._sum.hours?.toNumber() ?? 0,
-      value: row._sum.value?.toNumber() ?? 0,
-    };
+  for (const shift of shifts) {
+    const valor = shift.value.toNumber();
+    const horas = shift.hours.toNumber();
+    const alvo = shift.handoffTo ? summary.handedOff : summary[shift.paymentStatus];
 
-    summary[row.paymentStatus] = entry;
-    summary.total.count += entry.count;
-    summary.total.hours += entry.hours;
-    summary.total.value += entry.value;
+    alvo.count += 1;
+    alvo.hours += horas;
+    alvo.value += valor;
+
+    if (!shift.handoffTo) {
+      summary.total.count += 1;
+      summary.total.hours += horas;
+      summary.total.value += valor;
+    }
+  }
+
+  // Arredonda os centavos uma vez, no fim, em vez de a cada soma.
+  for (const chave of Object.keys(summary) as (keyof typeof summary)[]) {
+    summary[chave].hours = Math.round(summary[chave].hours * 100) / 100;
+    summary[chave].value = Math.round(summary[chave].value * 100) / 100;
   }
 
   return summary;

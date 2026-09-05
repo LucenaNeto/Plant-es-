@@ -104,6 +104,9 @@ model Shift {
   shiftType       ShiftType
   value           Decimal        @db.Decimal(10, 2)
   paymentStatus   PaymentStatus  @default(predicted)
+  /// Nome de quem assumiu este plantão. Preenchido significa repasse: o valor
+  /// sai da receita (previsto/pendente/recebido) e passa a somar em "repassado".
+  handoffTo       String?
   notes           String?
   recurringRuleId String?
   createdAt       DateTime       @default(now())

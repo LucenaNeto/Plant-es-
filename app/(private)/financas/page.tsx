@@ -114,6 +114,32 @@ export default async function FinancasPage({
             <StatCard label="Gastos" tone="rose" value={formatCurrency(finance.expenses)} />
           </section>
 
+          {/*
+            Repassado fica fora dos quatro cards acima porque não é receita.
+            Aparece só quando existe: um card zerado todo mês vira ruído para
+            quem nunca passa plantão.
+          */}
+          {finance.handedOff > 0 ? (
+            <section className="rounded-lg border border-violet-200 bg-violet-50 p-4">
+              <div className="flex items-baseline justify-between gap-3">
+                <div>
+                  <p className="text-sm text-violet-900/75">Repassado</p>
+                  <strong className="mt-1 block text-xl text-violet-950">
+                    {formatCurrency(finance.handedOff)}
+                  </strong>
+                </div>
+                <span className="text-sm text-violet-900/70">
+                  {finance.handedOffCount}{" "}
+                  {finance.handedOffCount === 1 ? "plantão" : "plantões"} de
+                  outra pessoa
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-violet-900/70">
+                Fora da receita — o valor é de quem assumiu o plantão
+              </p>
+            </section>
+          ) : null}
+
           <section className="rounded-lg border border-zinc-200 bg-white p-4 text-sm">
             <dl className="space-y-2">
               <div className="flex justify-between gap-3">

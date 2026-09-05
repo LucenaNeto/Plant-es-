@@ -48,6 +48,12 @@ export const shiftPayloadSchema = z.object({
    */
   confirmOverlap: checkbox.default(false),
   endTime: timeSchema,
+  /**
+   * Nome de quem assumiu o plantão. Preenchido significa repasse: o valor sai
+   * da receita e passa a somar no total "repassado". Vazio vira `null`, e não
+   * string vazia, para que a regra seja "preenchido ou não" sem casos de borda.
+   */
+  handoffTo: optionalText,
   notes: optionalText,
   paymentStatus: paymentStatusSchema.default("predicted"),
   shiftDate: z.string().trim().regex(ISO_DATE, "Informe a data do plantão."),

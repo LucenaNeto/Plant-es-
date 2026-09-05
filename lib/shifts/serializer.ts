@@ -25,6 +25,9 @@ export function serializeShift(shift: Shift & { unit: Pick<Unit, "name"> }) {
     dateLabel: formatShortDate(shift.shiftDate),
     endTime: shift.endTime,
     fullDateLabel: formatLongDate(shift.shiftDate),
+    handoffTo: shift.handoffTo,
+    /** Derivado: repassado é "tem alguém no handoffTo", sem terceira flag. */
+    isHandedOff: shift.handoffTo !== null,
     hours: shift.hours.toNumber(),
     id: shift.id,
     notes: shift.notes,
