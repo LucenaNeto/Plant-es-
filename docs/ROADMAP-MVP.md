@@ -9,7 +9,7 @@ Um bloco por branch. Nada é mesclado no `main` sem revisão e autorização.
 | Autenticação | Funcional (Prisma) | Funcional |
 | Unidades | CRUD via REST | CRUD via REST + camada de serviço |
 | Plantões | 100% mock | **CRUD completo, Server Actions** |
-| Agenda | 100% mock | 100% mock |
+| Agenda | 100% mock | **calendário real** |
 | Gastos | 100% mock | **CRUD completo, Server Actions** |
 | Finanças | 100% mock | 100% mock |
 | Dashboard | 100% mock | 100% mock |
@@ -95,9 +95,28 @@ de isolamento entre contas, e a confirmação de que excluir um plantão **não*
 leva o gasto junto — `shiftId` vira null por `onDelete: SetNull` e o gasto
 permanece vinculado à unidade.
 
-### Bloco 3 — `feature/agenda-real`
+### ✅ Bloco 3 — `feature/agenda-real`
 
 Calendário mensal com dados reais, cores por modalidade, detalhe do dia.
+
+- `buildCalendarGrid` monta a grade em aritmética UTC. Com `getDay()` local,
+  o mês começaria na coluna errada sempre que servidor (UTC) e usuário (BRT)
+  discordassem sobre o dia da semana do dia 1º — erro que aparece só em
+  alguns meses e some quando você vai investigar.
+- Semana começa no domingo, como os calendários impressos no Brasil, com
+  rótulos de três letras (`dom seg ter…`) para evitar a ambiguidade de
+  `S T Q Q S S D`.
+- **Mês na URL, dia em estado local.** Trocar de mês busca no servidor;
+  selecionar um dia é instantâneo, porque os plantões do mês inteiro já
+  vieram. Pôr o dia na URL custaria ~123ms por toque.
+- A agenda é para ver; a gestão fica em Plantões. Duplicar o formulário aqui
+  criaria dois caminhos para a mesma operação.
+
+Verificado: 48 meses (2024–2027) sem inconsistência de grade, contra
+referência independente via `Intl`/UTC — total de dias, coluna do dia 1º,
+ausência de buracos, ano bissexto. Mais 8 asserções de virada de mês contra
+o banco: plantão noturno de 30/09 pertence a setembro, não vaza para
+outubro, e ainda assim conflita com a manhã de 01/10.
 
 ### Bloco 4 — `feature/financas-dashboard`
 

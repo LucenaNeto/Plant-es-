@@ -182,6 +182,64 @@ export function addHoursToTime(
   return `${hh}:${mm}`;
 }
 
+/** Rótulos das colunas do calendário, começando no domingo. */
+export const WEEKDAY_LABELS = [
+  "dom",
+  "seg",
+  "ter",
+  "qua",
+  "qui",
+  "sex",
+  "sáb",
+] as const;
+
+export type CalendarCell = {
+  /** "YYYY-MM-DD", ou `null` no preenchimento antes/depois do mês. */
+  date: string | null;
+  day: number | null;
+};
+
+/**
+ * Grade mensal do calendário, em semanas completas de sete células.
+ *
+ * Toda a aritmética usa `Date.UTC` e `getUTC*`. Com `getDay()` local, o mês
+ * começaria na coluna errada sempre que o servidor (UTC) e o usuário (BRT)
+ * discordassem sobre o dia da semana do dia 1º — o tipo de erro que aparece
+ * só em alguns meses do ano e some quando você vai investigar.
+ *
+ * Começa no domingo, como os calendários impressos no Brasil.
+ *
+ * @param month 1-12, não o índice 0-11 do `Date` do JavaScript.
+ */
+export function buildCalendarGrid(year: number, month: number): CalendarCell[] {
+  const firstDay = new Date(Date.UTC(year, month - 1, 1));
+  const leadingBlanks = firstDay.getUTCDay();
+
+  // Dia 0 do mês seguinte é o último dia deste mês — resolve fevereiro e ano
+  // bissexto sem nenhum caso especial.
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  const cells: CalendarCell[] = [];
+
+  for (let index = 0; index < leadingBlanks; index++) {
+    cells.push({ date: null, day: null });
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    cells.push({
+      date: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+      day,
+    });
+  }
+
+  // Fecha a última semana para a grade não terminar irregular.
+  while (cells.length % 7 !== 0) {
+    cells.push({ date: null, day: null });
+  }
+
+  return cells;
+}
+
 /**
  * Os dois plantões se sobrepõem no tempo?
  *

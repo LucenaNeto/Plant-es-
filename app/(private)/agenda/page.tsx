@@ -1,60 +1,100 @@
+import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
-import { modalityStyles, sampleCalendarDays, sampleShifts } from "@/lib/mock-data";
+import { AgendaCalendar } from "@/features/agenda/agenda-calendar";
+import { requireSession } from "@/lib/auth/session";
+import {
+  toDateInputValue,
+  todayAsCalendarDate,
+} from "@/lib/dates/calendar-date";
+import { formatCurrency } from "@/lib/format";
+import { listShifts, summarizeShifts } from "@/server/services/shifts";
 
-export default function AgendaPage() {
+/**
+ * A agenda só precisa de mês e ano. Diferente de plantões e gastos, não tem
+ * filtro de unidade ou situação: o calendário existe para responder "o que eu
+ * tenho neste mês", e filtrar a grade esconderia dias ocupados, que é
+ * justamente o que ela deveria mostrar.
+ */
+function resolveMonth(params: Record<string, string | string[] | undefined>) {
+  const today = todayAsCalendarDate();
+  const single = (key: string) => {
+    const value = params[key];
+    return Array.isArray(value) ? value[0] : value;
+  };
+
+  const month = Number(single("month"));
+  const year = Number(single("year"));
+
+  const isValidMonth = Number.isInteger(month) && month >= 1 && month <= 12;
+  const isValidYear = Number.isInteger(year) && year >= 2000 && year <= 2100;
+
+  return {
+    month: isValidMonth ? month : today.getUTCMonth() + 1,
+    year: isValidYear ? year : today.getUTCFullYear(),
+  };
+}
+
+export default async function AgendaPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const session = await requireSession();
+  const { month, year } = resolveMonth(await searchParams);
+  const filters = {
+    month,
+    paymentStatus: undefined,
+    unitId: undefined,
+    year,
+  };
+
+  const [shifts, summary] = await Promise.all([
+    listShifts(session.user.id, filters),
+    summarizeShifts(session.user.id, filters),
+  ]);
+
   return (
     <div className="space-y-5">
       <PageHeader
         eyebrow="Agenda"
-        title="Agosto de 2026"
-        description="Visão mensal inicial com cores por modalidade e detalhe rápido dos dias com plantão."
+        title="Visão mensal"
+        description="Toque em um dia para ver os plantões daquela data."
       />
 
-      <section className="grid grid-cols-7 gap-1.5 rounded-lg border border-zinc-200 bg-white p-3">
-        {["S", "T", "Q", "Q", "S", "S", "D"].map((day, index) => (
-          <div className="py-2 text-center text-xs font-semibold text-zinc-500" key={`${day}-${index}`}>
-            {day}
-          </div>
-        ))}
-        {sampleCalendarDays.map((day) => (
-          <div
-            className="flex aspect-square flex-col items-center justify-center rounded-md border border-zinc-100 bg-stone-50 text-sm"
-            key={day.date}
-          >
-            <span className="font-medium">{day.day}</span>
-            {day.modality ? (
-              <span
-                className={`mt-1 h-2 w-2 rounded-full ${
-                  day.modality === "green"
-                    ? "bg-teal-500"
-                    : day.modality === "yellow"
-                      ? "bg-amber-500"
-                      : "bg-rose-500"
-                }`}
-              />
-            ) : null}
-          </div>
-        ))}
-      </section>
+      <Suspense>
+        <AgendaCalendar
+          month={month}
+          shifts={shifts}
+          today={toDateInputValue(todayAsCalendarDate())}
+          year={year}
+        />
+      </Suspense>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Plantões do mês</h2>
-        {sampleShifts.map((shift) => (
-          <article className="rounded-lg border border-zinc-200 bg-white p-4" key={shift.id}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="font-semibold">{shift.unit}</h3>
-                <p className="text-sm text-zinc-500">
-                  {shift.dateLabel}, {shift.startTime} - {shift.endTime}
-                </p>
-              </div>
-              <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${modalityStyles[shift.modality]}`}>
-                {shift.modalityLabel}
-              </span>
+      {summary.total.count > 0 ? (
+        <section className="rounded-lg border border-zinc-200 bg-white p-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <div>
+              <p className="text-sm text-zinc-500">Previsto no mês</p>
+              <strong className="mt-1 block text-2xl">
+                {formatCurrency(summary.total.value)}
+              </strong>
             </div>
-          </article>
-        ))}
-      </section>
+            <span className="text-sm text-zinc-500">
+              {summary.total.count}{" "}
+              {summary.total.count === 1 ? "plantão" : "plantões"} ·{" "}
+              {summary.total.hours}h
+            </span>
+          </div>
+        </section>
+      ) : (
+        <section className="rounded-lg border border-zinc-200 bg-white p-6 text-center">
+          <p className="font-medium">Mês sem plantões</p>
+          <p className="mt-1 text-sm text-zinc-500">
+            Os plantões que você lançar aparecem coloridos por modalidade neste
+            calendário.
+          </p>
+        </section>
+      )}
     </div>
   );
 }
