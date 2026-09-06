@@ -17,6 +17,7 @@ export const PRIVATE_ROUTES = [
   "/gastos",
   "/perfil",
   "/plantoes",
+  "/relatorios",
   "/unidades",
 ] as const;
 

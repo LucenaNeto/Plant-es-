@@ -1,4 +1,4 @@
-export type NavIcon = "home" | "calendar" | "clipboard" | "wallet" | "user";
+export type NavIcon = "home" | "calendar" | "clipboard" | "wallet" | "user" | "report";
 
 export type NavItem = {
   href: string;
@@ -19,6 +19,7 @@ export const bottomNavItems: NavItem[] = [
  * acesso direto no desktop.
  */
 export const secondaryNavItems: NavItem[] = [
+  { href: "/relatorios", icon: "report", label: "Relatórios" },
   { href: "/gastos", icon: "wallet", label: "Gastos" },
   { href: "/unidades", icon: "clipboard", label: "Unidades" },
 ];

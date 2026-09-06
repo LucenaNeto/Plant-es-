@@ -61,3 +61,37 @@ textarea {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+  Impressão. O relatório é feito para virar PDF pelo próprio navegador —
+  "Imprimir → Salvar como PDF" — em vez de carregar uma biblioteca de PDF que
+  pesaria no bundle de um app usado no celular.
+
+  A navegação, o cabeçalho da página e os botões somem: numa folha de papel
+  eles ocupam espaço e não levam a lugar nenhum.
+*/
+@media print {
+  nav,
+  aside {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  /* Sem sombra e sem fundo cinza: economiza tinta e melhora o contraste. */
+  section,
+  article {
+    box-shadow: none !important;
+  }
+
+  /* Uma unidade não deve ser cortada ao meio entre duas páginas. */
+  .print\:break-inside-avoid {
+    break-inside: avoid;
+  }
+}
