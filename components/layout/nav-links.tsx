@@ -6,43 +6,15 @@ import { NavIconSvg } from "@/components/layout/nav-icon";
 import { isActiveNavItem, type NavItem } from "@/lib/navigation";
 
 /**
- * Links de navegação com estado ativo.
- *
- * Até aqui o menu não indicava em que tela o usuário estava — num app de cinco
- * abas, sem esse sinal a pessoa toca no item em que já está e conclui que o
- * app travou.
+ * Links da barra lateral, com estado ativo.
  *
  * `aria-current="page"` acompanha o destaque visual: leitores de tela anunciam
- * a página atual em vez de ler cinco links indistinguíveis.
+ * a página atual em vez de ler uma lista de links indistinguíveis.
+ *
+ * A barra do celular vive em `bottom-nav.tsx`, que precisa de estado próprio
+ * para o menu "Mais" — separar evita carregar essa lógica no desktop, onde
+ * todos os destinos já cabem na lateral.
  */
-
-export function BottomNavLinks({ items }: { items: NavItem[] }) {
-  const pathname = usePathname();
-
-  return (
-    <>
-      {items.map((item) => {
-        const isActive = isActiveNavItem(pathname, item.href);
-
-        return (
-          <Link
-            aria-current={isActive ? "page" : undefined}
-            className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-center text-[11px] font-medium transition ${
-              isActive
-                ? "bg-stone-100 text-zinc-950"
-                : "text-zinc-500 hover:bg-stone-50 hover:text-zinc-800"
-            }`}
-            href={item.href}
-            key={item.href}
-          >
-            <NavIconSvg name={item.icon} />
-            {item.label}
-          </Link>
-        );
-      })}
-    </>
-  );
-}
 
 export function SidebarNavLinks({ items }: { items: NavItem[] }) {
   const pathname = usePathname();

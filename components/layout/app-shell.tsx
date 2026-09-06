@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { SignOutButton } from "@/components/auth/sign-out-button";
-import {
-  BottomNavLinks,
-  SidebarNavLinks,
-} from "@/components/layout/nav-links";
-import { bottomNavItems, secondaryNavItems } from "@/lib/navigation";
+import { BottomNav } from "@/components/layout/bottom-nav";
+import { SidebarNavLinks } from "@/components/layout/nav-links";
+import { bottomNavItems, moreNavItems } from "@/lib/navigation";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -35,7 +33,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">
               Cadastros
             </p>
-            <SidebarNavLinks items={secondaryNavItems} />
+            <SidebarNavLinks items={moreNavItems} />
           </nav>
 
           <SignOutButton />
@@ -46,14 +44,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      <nav
-        aria-label="Navegação principal"
-        className="fixed inset-x-0 bottom-0 border-t border-zinc-200 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-lg backdrop-blur lg:hidden"
-      >
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
-          <BottomNavLinks items={bottomNavItems} />
-        </div>
-      </nav>
+      <BottomNav />
+
     </div>
   );
 }

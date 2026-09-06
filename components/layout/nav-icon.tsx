@@ -22,6 +22,13 @@ const PATHS: Record<NavIcon, React.ReactNode> = {
       <path d="M9 12h6M9 16h4" />
     </>
   ),
+  more: (
+    <>
+      <circle cx="5.5" cy="12" r="1.4" />
+      <circle cx="12" cy="12" r="1.4" />
+      <circle cx="18.5" cy="12" r="1.4" />
+    </>
+  ),
   report: (
     <>
       <path d="M6 4h9l3 3v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" />

@@ -282,12 +282,25 @@ export default async function RelatoriosPage({
             </p>
           ) : null}
 
-          <a
-            className="flex min-h-12 items-center justify-center rounded-md border border-zinc-200 font-semibold text-zinc-700 print:hidden"
-            href={`/api/relatorios/csv?${csvParams.toString()}`}
-          >
-            Baixar CSV
-          </a>
+          <div className="grid gap-2 sm:grid-cols-2 print:hidden">
+            {/*
+              Dois formatos para dois leitores. O CSV vai para planilha e
+              contador; o TXT é o texto que se cola numa mensagem para avisar a
+              escala a um colega ou ao hospital.
+            */}
+            <a
+              className="flex min-h-12 items-center justify-center rounded-md border border-zinc-200 font-semibold text-zinc-700"
+              href={`/api/relatorios/txt?${csvParams.toString()}`}
+            >
+              Baixar TXT
+            </a>
+            <a
+              className="flex min-h-12 items-center justify-center rounded-md border border-zinc-200 font-semibold text-zinc-700"
+              href={`/api/relatorios/csv?${csvParams.toString()}`}
+            >
+              Baixar CSV
+            </a>
+          </div>
         </>
       )}
     </div>
