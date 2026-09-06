@@ -229,6 +229,123 @@ export async function updateShift(
 }
 
 /**
+ * Datas em que a duplicação vai criar plantões.
+ *
+ * Calculada aqui **e** no cliente, a partir das mesmas regras, para que a
+ * prévia mostrada antes de confirmar seja exatamente o que será criado. Uma
+ * prévia que diverge do resultado é pior que prévia nenhuma.
+ *
+ * Começa no dia seguinte ao plantão de origem: duplicar não deve recriar o
+ * próprio plantão nem preencher dias que já passaram.
+ */
+export function duplicationDates(
+  origem: Date,
+  weekdays: number[],
+  monthsAhead: number,
+) {
+  const dias = new Set(weekdays);
+  const inicio = new Date(origem.getTime() + ONE_DAY_MS);
+
+  // Fim do mês de origem, mais `monthsAhead` meses inteiros.
+  const fim = new Date(
+    Date.UTC(
+      origem.getUTCFullYear(),
+      origem.getUTCMonth() + monthsAhead + 1,
+      0,
+    ),
+  );
+
+  const datas: Date[] = [];
+
+  for (let t = inicio.getTime(); t <= fim.getTime(); t += ONE_DAY_MS) {
+    const data = new Date(t);
+
+    if (dias.has(data.getUTCDay())) {
+      datas.push(data);
+    }
+  }
+
+  return datas;
+}
+
+export type DuplicationResult = {
+  created: number;
+  /** Datas puladas por já existir plantão igual — não são erro. */
+  skipped: number;
+};
+
+/**
+ * Replica um plantão nos dias da semana escolhidos, até o fim do mês de origem
+ * ou dos meses seguintes.
+ *
+ * A duplicação anterior apenas abria o formulário preenchido, o que obrigava a
+ * repetir a operação plantão a plantão — inútil para quem trabalha toda terça.
+ *
+ * **Pula o que já existe.** "Já existe" aqui é: mesmo dia, mesma unidade e
+ * mesmo horário de início. Sem isso, duplicar duas vezes encheria a agenda de
+ * plantões idênticos, e o usuário só descobriria ao conferir o mês.
+ *
+ * As cópias não herdam a situação de pagamento nem o repasse do original: são
+ * plantões futuros, então nascem como "previsto" e sem repasse.
+ */
+export async function duplicateShiftAcross(
+  userId: string,
+  shiftId: string,
+  weekdays: number[],
+  monthsAhead: number,
+): Promise<DuplicationResult | null> {
+  const origem = await prisma.shift.findFirst({
+    where: { id: shiftId, userId },
+  });
+
+  if (!origem) {
+    return null;
+  }
+
+  const datas = duplicationDates(origem.shiftDate, weekdays, monthsAhead);
+
+  if (datas.length === 0) {
+    return { created: 0, skipped: 0 };
+  }
+
+  const existentes = await prisma.shift.findMany({
+    select: { shiftDate: true },
+    where: {
+      shiftDate: { gte: datas[0], lte: datas[datas.length - 1] },
+      startTime: origem.startTime,
+      unitId: origem.unitId,
+      userId,
+    },
+  });
+
+  const ocupadas = new Set(existentes.map((s) => toDateInputValue(s.shiftDate)));
+  const novos = datas
+    .filter((data) => !ocupadas.has(toDateInputValue(data)))
+    .map((data) => ({
+      category: origem.category,
+      endTime: origem.endTime,
+      hours: origem.hours,
+      notes: origem.notes,
+      paymentStatus: "predicted" as const,
+      // A cópia não pertence à série da regra: foi criada por duplicação
+      // manual, e vinculá-la faria "cancelar futuros" da regra apagá-la.
+      recurringRuleId: null,
+      shiftDate: data,
+      shiftType: origem.shiftType,
+      startTime: origem.startTime,
+      unitId: origem.unitId,
+      userId,
+      value: origem.value,
+    }));
+
+  if (novos.length > 0) {
+    await prisma.shift.createMany({ data: novos });
+  }
+
+  return { created: novos.length, skipped: datas.length - novos.length };
+}
+
+/**
  * Marca ou desfaz o repasse de um plantão.
  *
  * **Repasse é um acontecimento sobre uma ocorrência, não um tipo de plantão.**

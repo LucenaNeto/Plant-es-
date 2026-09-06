@@ -108,3 +108,12 @@ export const handoffSchema = z.object({
     .max(120, "Nome muito longo.")
     .transform((valor) => valor || null),
 });
+
+/** Duplicação em lote: quais dias da semana e por quantos meses. */
+export const duplicationSchema = z.object({
+  monthsAhead: z.coerce.number().int().min(0).max(12).default(0),
+  weekdays: z.preprocess(
+    (value) => (Array.isArray(value) ? value : value == null ? [] : [value]),
+    z.array(z.coerce.number().int().min(0).max(6)).min(1, "Escolha ao menos um dia."),
+  ),
+});

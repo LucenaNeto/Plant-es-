@@ -7,6 +7,7 @@ import {
   type ActionResult,
 } from "@/lib/action-result";
 import {
+  duplicationSchema,
   handoffSchema,
   paymentStatusUpdateSchema,
   recurrenceSchema,
@@ -16,6 +17,7 @@ import type { SerializedShift } from "@/lib/shifts/serializer";
 import {
   createShift,
   deleteShift,
+  duplicateShiftAcross,
   findOverlappingShifts,
   setHandoff,
   setPaymentStatus,
@@ -367,6 +369,67 @@ export async function setHandoffAction(
       shift.handoffTo
         ? `Plantão repassado a ${shift.handoffTo}. O valor saiu da sua receita.`
         : "Repasse desfeito. O plantão voltou a ser seu.",
+    );
+  });
+}
+
+/**
+ * Duplica um plantão nos dias da semana escolhidos, até o fim do mês de origem
+ * ou dos meses seguintes.
+ *
+ * A duplicação antiga só abria o formulário preenchido — útil para copiar um
+ * plantão, inútil para quem trabalha toda terça e quer preencher o mês.
+ */
+export async function duplicateShiftAction(
+  shiftId: string,
+  _previousState: ActionResult<{ created: number; skipped: number }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ created: number; skipped: number }>> {
+  return runAuthenticatedAction("shift.duplicate", async ({ logger, userId }) => {
+    const parsed = duplicationSchema.safeParse({
+      monthsAhead: formData.get("monthsAhead"),
+      weekdays: formData.getAll("weekdays"),
+    });
+
+    if (!parsed.success) {
+      return validationFailure(parsed.error.flatten().fieldErrors);
+    }
+
+    const resultado = await duplicateShiftAcross(
+      userId,
+      shiftId,
+      parsed.data.weekdays,
+      parsed.data.monthsAhead,
+    );
+
+    if (!resultado) {
+      return actionFail("not_found", "Plantão não encontrado.");
+    }
+
+    logger.info("shift.duplicated", {
+      created: resultado.created,
+      monthsAhead: parsed.data.monthsAhead,
+      shiftId,
+      skipped: resultado.skipped,
+    });
+
+    revalidateShiftViews();
+
+    if (resultado.created === 0) {
+      return actionOk(
+        resultado,
+        resultado.skipped > 0
+          ? "Nada a criar — esses dias já têm este plantão."
+          : "Nenhuma data encontrada para duplicar.",
+      );
+    }
+
+    return actionOk(
+      resultado,
+      `${resultado.created} ${resultado.created === 1 ? "plantão criado" : "plantões criados"}` +
+        (resultado.skipped > 0
+          ? `. ${resultado.skipped} ${resultado.skipped === 1 ? "data já tinha" : "datas já tinham"} este plantão.`
+          : "."),
     );
   });
 }

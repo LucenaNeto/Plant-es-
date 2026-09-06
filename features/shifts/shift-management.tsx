@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { DuplicatePanel } from "@/features/shifts/duplicate-panel";
 import { ShiftCard } from "@/features/shifts/shift-card";
 import { ShiftForm } from "@/features/shifts/shift-form";
 import type { SerializedShift } from "@/lib/shifts/serializer";
@@ -16,6 +17,11 @@ type FormMode =
   | { kind: "closed" }
   | { kind: "create" }
   | { kind: "edit"; shift: SerializedShift }
+  /**
+   * Duplicar deixou de abrir o formulário preenchido e passou a abrir um painel
+   * de replicação em lote. Copiar um plantão para um único dia continua
+   * possível pelo botão "Novo plantão"; o que faltava era preencher o mês.
+   */
   | { kind: "duplicate"; shift: SerializedShift };
 
 export function ShiftManagement({
@@ -42,16 +48,18 @@ export function ShiftManagement({
         >
           Novo plantão
         </button>
+      ) : mode.kind === "duplicate" ? (
+        <DuplicatePanel
+          key={`duplicate-${mode.shift.id}`}
+          onClose={close}
+          shift={mode.shift}
+        />
       ) : (
         <ShiftForm
-          key={
-            mode.kind === "edit" || mode.kind === "duplicate"
-              ? `${mode.kind}-${mode.shift.id}`
-              : "create"
-          }
+          key={mode.kind === "edit" ? `edit-${mode.shift.id}` : "create"}
           onCancel={close}
           onSaved={close}
-          shift={mode.kind === "create" ? undefined : mode.shift}
+          shift={mode.kind === "edit" ? mode.shift : undefined}
           shiftId={mode.kind === "edit" ? mode.shift.id : null}
           units={units}
         />
