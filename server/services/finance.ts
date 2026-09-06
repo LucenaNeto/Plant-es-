@@ -70,7 +70,13 @@ export async function getMonthlyFinance(
 ) {
   const { start, end } = monthRange(year, month);
 
-  const [shifts, expenses] = await Promise.all([
+  /**
+   * `$transaction` em vez de `Promise.all`: agrupa as duas consultas numa ida
+   * só ao banco. Com o pooler em transaction mode cada consulta carrega um
+   * custo fixo alto (medido: 256ms contra 57ms em session mode), e agrupar
+   * derruba pela metade o tempo de tela. Em session mode não atrapalha.
+   */
+  const [shifts, expenses] = await prisma.$transaction([
     prisma.shift.findMany({
       select: {
         handoffTo: true,
