@@ -435,12 +435,13 @@ export async function setPaymentStatus(
  * 45 dias cobre com folga os 4 próximos plantões de quem trabalha semanalmente,
  * sem trazer meses de agenda que a tela não exibe.
  */
-export async function getScheduleWindow(userId: string, upcomingLimit = 4) {
+/** A consulta da janela de agenda, sem executá-la — para agrupar com outras. */
+export function scheduleQuery(userId: string) {
   const today = todayAsCalendarDate();
-  const { start: weekStart, end: weekEnd } = weekRange(today);
+  const { start: weekStart } = weekRange(today);
   const horizonte = new Date(today.getTime() + 45 * 86400000);
 
-  const shifts = await prisma.shift.findMany({
+  return prisma.shift.findMany({
     include: WITH_UNIT_NAME,
     orderBy: [{ shiftDate: "asc" }, { startTime: "asc" }],
     where: {
@@ -448,6 +449,15 @@ export async function getScheduleWindow(userId: string, upcomingLimit = 4) {
       userId,
     },
   });
+}
+
+/** Monta a janela a partir das linhas já buscadas. Puro, sem tocar no banco. */
+export function buildScheduleWindow(
+  shifts: Awaited<ReturnType<typeof scheduleQuery>>,
+  upcomingLimit = 4,
+) {
+  const today = todayAsCalendarDate();
+  const { start: weekStart, end: weekEnd } = weekRange(today);
 
   const serializados = shifts.map((shift) => ({
     ...serializeShift(shift),
@@ -475,7 +485,11 @@ export async function getScheduleWindow(userId: string, upcomingLimit = 4) {
   };
 }
 
-export type ScheduleWindow = Awaited<ReturnType<typeof getScheduleWindow>>;
+export async function getScheduleWindow(userId: string, upcomingLimit = 4) {
+  return buildScheduleWindow(await scheduleQuery(userId), upcomingLimit);
+}
+
+export type ScheduleWindow = ReturnType<typeof buildScheduleWindow>;
 
 /**
  * Próximo plantão a partir de hoje, para o destaque do dashboard.

@@ -63,20 +63,18 @@ function centavos(valor: number) {
   return Math.round(valor * 100) / 100;
 }
 
-export async function getMonthlyFinance(
-  userId: string,
-  year: number,
-  month: number,
-) {
+/**
+ * As consultas do resumo, sem executá-las.
+ *
+ * Devolver as consultas em vez do resultado permite ao chamador agrupá-las com
+ * outras num único `$transaction`. Isso importa muito com o pooler em
+ * transaction mode, onde cada ida ao banco custa ~256ms: a tela inicial passa
+ * de três viagens para uma.
+ */
+export function financeQueries(userId: string, year: number, month: number) {
   const { start, end } = monthRange(year, month);
 
-  /**
-   * `$transaction` em vez de `Promise.all`: agrupa as duas consultas numa ida
-   * só ao banco. Com o pooler em transaction mode cada consulta carrega um
-   * custo fixo alto (medido: 256ms contra 57ms em session mode), e agrupar
-   * derruba pela metade o tempo de tela. Em session mode não atrapalha.
-   */
-  const [shifts, expenses] = await prisma.$transaction([
+  return [
     prisma.shift.findMany({
       select: {
         handoffTo: true,
@@ -97,8 +95,17 @@ export async function getMonthlyFinance(
       },
       where: { expenseDate: { gte: start, lt: end }, userId },
     }),
-  ]);
+  ] as const;
+}
 
+type FinanceRows = {
+  [K in keyof ReturnType<typeof financeQueries>]: Awaited<
+    ReturnType<typeof financeQueries>[K]
+  >;
+};
+
+/** Agregação pura: mesmas regras, sem tocar no banco. */
+export function aggregateFinance(shifts: FinanceRows[0], expenses: FinanceRows[1]) {
   const totals: Record<PaymentStatus, number> = {
     pending: 0,
     predicted: 0,
@@ -222,4 +229,17 @@ export async function getMonthlyFinance(
   };
 }
 
-export type MonthlyFinance = Awaited<ReturnType<typeof getMonthlyFinance>>;
+
+export async function getMonthlyFinance(
+  userId: string,
+  year: number,
+  month: number,
+) {
+  const [shifts, expenses] = await prisma.$transaction([
+    ...financeQueries(userId, year, month),
+  ]);
+
+  return aggregateFinance(shifts, expenses);
+}
+
+export type MonthlyFinance = ReturnType<typeof aggregateFinance>;

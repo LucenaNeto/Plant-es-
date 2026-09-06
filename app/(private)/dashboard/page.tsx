@@ -2,11 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { QuickAction } from "@/components/ui/quick-action";
 import { requireSession } from "@/lib/auth/session";
-import {
-  formatMonthLabel,
-  todayAsCalendarDate,
-  WEEKDAY_LABELS,
-} from "@/lib/dates/calendar-date";
+import { formatMonthLabel, WEEKDAY_LABELS } from "@/lib/dates/calendar-date";
 import { formatCurrency } from "@/lib/format";
 import {
   MODALITY_DOT,
@@ -16,9 +12,7 @@ import {
   PAYMENT_STATUS_STYLES,
   SHIFT_TYPE_LABELS,
 } from "@/lib/shifts/labels";
-import { prisma } from "@/lib/db/prisma";
-import { getMonthlyFinance } from "@/server/services/finance";
-import { getScheduleWindow } from "@/server/services/shifts";
+import { getDashboardData } from "@/server/services/dashboard";
 
 export const metadata: Metadata = {
   description: "Seus próximos plantões e o resumo do mês.",
@@ -33,21 +27,15 @@ export const metadata: Metadata = {
  * primeiro, a semana logo abaixo, e o financeiro fecha a tela em uma linha.
  * Quem quer os números em detalhe vai a Finanças, que existe para isso.
  *
- * São quatro consultas: a janela de agenda (uma só, cobrindo semana e
- * próximos), as duas do resumo financeiro e a contagem de unidades. A versão
- * anterior fazia oito, e com `connection_limit=1` consultas não paralelizam.
+ * As quatro consultas vão numa ida só ao banco (`getDashboardData`). Com
+ * `connection_limit=1` elas se enfileirariam de qualquer forma, e com o pooler
+ * em transaction mode cada viagem custa caro — agrupar é o que mantém a tela
+ * rápida.
  */
 export default async function DashboardPage() {
   const session = await requireSession();
-  const today = todayAsCalendarDate();
-  const year = today.getUTCFullYear();
-  const month = today.getUTCMonth() + 1;
-
-  const [schedule, finance, activeUnitCount] = await Promise.all([
-    getScheduleWindow(session.user.id),
-    getMonthlyFinance(session.user.id, year, month),
-    prisma.unit.count({ where: { active: true, userId: session.user.id } }),
-  ]);
+  const { activeUnitCount, finance, month, schedule, year } =
+    await getDashboardData(session.user.id);
 
   const [next, ...later] = schedule.upcoming;
   const weekShiftCount = schedule.week.reduce(
