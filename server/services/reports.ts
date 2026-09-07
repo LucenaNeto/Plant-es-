@@ -35,6 +35,7 @@ type SeriesRow = {
   mes: number;
   horas: number;
   valor: number;
+  recebido: number;
   plantoes: number;
 };
 
@@ -95,6 +96,11 @@ export async function getReport(userId: string, filters: ReportFilters) {
         EXTRACT(MONTH FROM "shiftDate")::int AS mes,
         COALESCE(SUM("hours"), 0)::float     AS horas,
         COALESCE(SUM("value"), 0)::float     AS valor,
+        -- Recebido separado do bruto: a diferença entre os dois é exatamente
+        -- o que ainda precisa ser cobrado, e é o número que o comparativo
+        -- existe para revelar.
+        COALESCE(SUM(CASE WHEN "paymentStatus" = 'received' THEN "value" ELSE 0 END), 0)::float
+                                             AS recebido,
         COUNT(*)::int                        AS plantoes
       FROM "Shift"
       WHERE "userId" = ${userId}
@@ -173,24 +179,39 @@ export async function getReport(userId: string, filters: ReportFilters) {
   );
 
   /** Doze meses do ano escolhido, com zeros — o gráfico precisa da lacuna. */
-  const monthlyHours = Array.from({ length: 12 }, (_, indice) => {
+  const monthly = Array.from({ length: 12 }, (_, indice) => {
     const linha = serie.find(
       (s) => s.ano === filters.year && s.mes === indice + 1,
     );
 
+    const valor = arredonda(linha?.valor ?? 0);
+    const recebido = arredonda(linha?.recebido ?? 0);
+
     return {
       hours: arredonda(linha?.horas ?? 0),
       month: indice + 1,
+      received: recebido,
       shiftCount: linha?.plantoes ?? 0,
-      value: arredonda(linha?.valor ?? 0),
+      /** Bruto menos recebido: o que ainda está para entrar. */
+      toReceive: arredonda(valor - recebido),
+      value: valor,
     };
   });
 
-  const porAno = new Map<number, { hours: number; shiftCount: number; value: number }>();
+  const porAno = new Map<
+    number,
+    { hours: number; received: number; shiftCount: number; value: number }
+  >();
 
   for (const linha of serie) {
-    const ano = porAno.get(linha.ano) ?? { hours: 0, shiftCount: 0, value: 0 };
+    const ano = porAno.get(linha.ano) ?? {
+      hours: 0,
+      received: 0,
+      shiftCount: 0,
+      value: 0,
+    };
     ano.hours += linha.horas;
+    ano.received += linha.recebido;
     ano.shiftCount += linha.plantoes;
     ano.value += linha.valor;
     porAno.set(linha.ano, ano);
@@ -199,7 +220,9 @@ export async function getReport(userId: string, filters: ReportFilters) {
   const yearly = [...porAno.entries()]
     .map(([year, dados]) => ({
       hours: arredonda(dados.hours),
+      received: arredonda(dados.received),
       shiftCount: dados.shiftCount,
+      toReceive: arredonda(dados.value - dados.received),
       value: arredonda(dados.value),
       year,
     }))
@@ -208,7 +231,7 @@ export async function getReport(userId: string, filters: ReportFilters) {
   return {
     byUnit,
     handedOffCount: linhas.filter((l) => l.handoffTo).length,
-    monthlyHours,
+    monthly,
     totals,
     user,
     yearly,

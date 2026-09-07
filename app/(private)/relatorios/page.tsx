@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
-import { BarChart } from "@/features/reports/bar-chart";
+import { BarChart, BarChartLegend } from "@/features/reports/bar-chart";
 import { ReportFilters } from "@/features/reports/report-filters";
 import { requireSession } from "@/lib/auth/session";
 import { formatMonthLabel, todayAsCalendarDate } from "@/lib/dates/calendar-date";
@@ -23,6 +23,11 @@ const MESES_CURTOS = [
   "jan", "fev", "mar", "abr", "mai", "jun",
   "jul", "ago", "set", "out", "nov", "dez",
 ];
+
+/** Quanto do bruto já entrou, em pontos percentuais inteiros. */
+function percentual(parte: number, total: number) {
+  return total > 0 ? Math.round((parte / total) * 100) : 0;
+}
 
 function resolveFilters(params: Record<string, string | string[] | undefined>) {
   const hoje = todayAsCalendarDate();
@@ -70,6 +75,8 @@ export default async function RelatoriosPage({
   if (showValues) csvParams.set("valores", "1");
 
   const temHistorico = relatorio.yearly.length > 1;
+  const aReceber =
+    Math.round((relatorio.totals.value - relatorio.totals.received) * 100) / 100;
 
   return (
     <div className="space-y-5">
@@ -168,7 +175,7 @@ export default async function RelatoriosPage({
             </h2>
             <div className="mt-3">
               <BarChart
-                bars={relatorio.monthlyHours.map((linha) => ({
+                bars={relatorio.monthly.map((linha) => ({
                   fill: linha.month === filtros.month ? "#09090b" : "#0f766e",
                   label: MESES_CURTOS[linha.month - 1],
                   secondary:
@@ -188,15 +195,91 @@ export default async function RelatoriosPage({
                   bars={relatorio.yearly.map((linha) => ({
                     fill: linha.year === filtros.year ? "#09090b" : "#0f766e",
                     label: String(linha.year),
-                    secondary: showValues
-                      ? formatCurrency(linha.value)
-                      : `${linha.shiftCount}p`,
+                    secondary: `${linha.shiftCount}p`,
                     value: linha.hours,
                   }))}
                   formatValue={(valor) => `${valor}h`}
                 />
               </div>
             </section>
+          ) : null}
+
+          {/*
+            Recebimentos. Só aparece com "incluir valores" ligado: o relatório
+            operacional é feito para mandar ao hospital, e mostrar dinheiro ali
+            seria vazar informação que não é da conta de quem recebe a escala.
+          */}
+          {showValues ? (
+            <>
+              <section className="grid grid-cols-2 gap-3">
+                <article className="rounded-lg border border-teal-200 bg-teal-50 p-4">
+                  <p className="text-sm text-teal-900/75">Recebido</p>
+                  <strong className="mt-1 block text-2xl text-teal-950">
+                    {formatCurrency(relatorio.totals.received)}
+                  </strong>
+                  <p className="mt-1 text-xs text-teal-900/70">
+                    {percentual(relatorio.totals.received, relatorio.totals.value)}
+                    % do bruto do período
+                  </p>
+                </article>
+
+                <article className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-sm text-amber-900/75">Ainda a receber</p>
+                  <strong className="mt-1 block text-2xl text-amber-950">
+                    {formatCurrency(aReceber)}
+                  </strong>
+                  <p className="mt-1 text-xs text-amber-900/70">
+                    {aReceber > 0
+                      ? "Plantões trabalhados sem pagamento confirmado"
+                      : "Tudo em dia"}
+                  </p>
+                </article>
+              </section>
+
+              <section className="rounded-lg border border-zinc-200 bg-white p-4 print:break-inside-avoid">
+                <h2 className="text-base font-semibold">
+                  Recebimentos por mês · {filtros.year}
+                </h2>
+                <div className="mt-3">
+                  <BarChart
+                    bars={relatorio.monthly.map((linha) => ({
+                      label: MESES_CURTOS[linha.month - 1],
+                      secondary:
+                        linha.toReceive > 0
+                          ? `+${formatCurrency(linha.toReceive)}`
+                          : undefined,
+                      stacked: linha.toReceive,
+                      value: linha.received,
+                    }))}
+                    formatValue={(valor) => formatCurrency(valor)}
+                  />
+                </div>
+                <BarChartLegend base="Recebido" stacked="A receber" />
+              </section>
+
+              {temHistorico ? (
+                <section className="rounded-lg border border-zinc-200 bg-white p-4 print:break-inside-avoid">
+                  <h2 className="text-base font-semibold">
+                    Recebimentos por ano
+                  </h2>
+                  <div className="mt-3">
+                    <BarChart
+                      bars={relatorio.yearly.map((linha) => ({
+                        label: String(linha.year),
+                        secondary:
+                          linha.toReceive > 0
+                            ? `+${formatCurrency(linha.toReceive)}`
+                            : undefined,
+                        stacked: linha.toReceive,
+                        value: linha.received,
+                      }))}
+                      formatValue={(valor) => formatCurrency(valor)}
+                    />
+                  </div>
+                  <BarChartLegend base="Recebido" stacked="A receber" />
+                </section>
+              ) : null}
+            </>
           ) : null}
 
           {relatorio.byUnit.map((unidade) => (
