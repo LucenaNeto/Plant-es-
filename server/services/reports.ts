@@ -178,18 +178,49 @@ export async function getReport(userId: string, filters: ReportFilters) {
     { hours: 0, received: 0, shiftCount: 0, value: 0 },
   );
 
-  /** Doze meses do ano escolhido, com zeros — o gráfico precisa da lacuna. */
-  const monthly = Array.from({ length: 12 }, (_, indice) => {
-    const linha = serie.find(
-      (s) => s.ano === filters.year && s.mes === indice + 1,
+  /**
+   * Doze meses do ano escolhido, com zeros — o gráfico precisa da lacuna.
+   *
+   * Cada mês carrega três leituras do mesmo recebimento: o valor absoluto, o
+   * mesmo mês do ano anterior (para o comparativo lado a lado) e a variação
+   * sobre o mês imediatamente anterior.
+   */
+  const recebidoNoMes = (ano: number, mes: number) =>
+    arredonda(
+      serie.find((linha) => linha.ano === ano && linha.mes === mes)?.recebido ?? 0,
     );
+
+  const monthly = Array.from({ length: 12 }, (_, indice) => {
+    const mes = indice + 1;
+    const linha = serie.find((s) => s.ano === filters.year && s.mes === mes);
 
     const valor = arredonda(linha?.valor ?? 0);
     const recebido = arredonda(linha?.recebido ?? 0);
 
+    /**
+     * Dezembro compara com dezembro do ano anterior, não com janeiro deste —
+     * por isso a busca atravessa a virada de ano em vez de olhar `monthly[-1]`.
+     */
+    const anterior =
+      mes === 1
+        ? recebidoNoMes(filters.year - 1, 12)
+        : recebidoNoMes(filters.year, mes - 1);
+
     return {
       hours: arredonda(linha?.horas ?? 0),
-      month: indice + 1,
+      month: mes,
+      /**
+       * Variação sobre o mês anterior, em pontos percentuais.
+       *
+       * `null` quando não há base de comparação: sair de zero não é "aumento
+       * de 100%", é a primeira entrada — e exibir um percentual ali seria
+       * inventar significado onde não existe.
+       */
+      changeFromPreviousMonth:
+        anterior > 0 ? Math.round(((recebido - anterior) / anterior) * 100) : null,
+      previousMonthReceived: anterior,
+      /** Mesmo mês do ano anterior, para o comparativo lado a lado. */
+      previousYearReceived: recebidoNoMes(filters.year - 1, mes),
       received: recebido,
       shiftCount: linha?.plantoes ?? 0,
       /** Bruto menos recebido: o que ainda está para entrar. */
@@ -228,7 +259,22 @@ export async function getReport(userId: string, filters: ReportFilters) {
     }))
     .sort((a, b) => a.year - b.year);
 
+  /**
+   * Acumulado de tudo que já entrou, em qualquer período — a resposta para
+   * "quanto eu já recebi até hoje". Sai da mesma série dos gráficos: ela já
+   * cobre o histórico inteiro, então não custa consulta nenhuma.
+   */
+  const allTimeReceived = arredonda(
+    serie.reduce((soma, linha) => soma + linha.recebido, 0),
+  );
+
+  const allTimeGross = arredonda(
+    serie.reduce((soma, linha) => soma + linha.valor, 0),
+  );
+
   return {
+    allTimeGross,
+    allTimeReceived,
     byUnit,
     handedOffCount: linhas.filter((l) => l.handoffTo).length,
     monthly,

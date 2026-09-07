@@ -11,6 +11,15 @@ export type Bar = {
    * comparativo existe para revelar.
    */
   stacked?: number;
+  /**
+   * Barra de comparação, desenhada ao lado da principal.
+   *
+   * É o "2025 vs 2026, mês a mês": duas barras lado a lado no mesmo mês. Quando
+   * qualquer barra do gráfico tem `compare`, todas passam a ser desenhadas em
+   * par — senão os meses ficariam com larguras diferentes e a comparação visual
+   * se perderia.
+   */
+  compare?: number;
   value: number;
 };
 
@@ -26,20 +35,23 @@ export type Bar = {
  */
 export function BarChart({
   bars,
+  compareFill = "#a1a1aa",
   formatValue,
   height = 160,
   stackedFill = "#99f6e4",
 }: {
   bars: Bar[];
+  compareFill?: string;
   /** Como escrever o número no topo da barra. */
   formatValue: (value: number) => string;
   height?: number;
   stackedFill?: string;
 }) {
+  const agrupado = bars.some((bar) => bar.compare !== undefined);
   // A escala considera o topo da pilha, não só o segmento de baixo — senão a
   // barra mais alta estouraria a área do gráfico.
   const maior = Math.max(
-    ...bars.map((bar) => bar.value + (bar.stacked ?? 0)),
+    ...bars.map((bar) => Math.max(bar.value + (bar.stacked ?? 0), bar.compare ?? 0)),
     0,
   );
   const largura = 100 / Math.max(bars.length, 1);
@@ -67,18 +79,32 @@ export function BarChart({
           const base = bar.value > 0 ? Math.max(alturaBase, 2) : 0;
           const topo = (bar.stacked ?? 0) > 0 ? Math.max(alturaTopo, 2) : 0;
 
-          const x = indice * largura + largura * 0.19;
-          const w = largura * 0.62;
+          // Agrupado: duas barras estreitas lado a lado. Sozinha: uma larga.
+          const w = largura * (agrupado ? 0.3 : 0.62);
+          const x = indice * largura + largura * (agrupado ? 0.17 : 0.19);
+          const alturaCompare =
+            (bar.compare ?? 0) > 0 ? Math.max(altura(bar.compare ?? 0), 2) : 0;
 
           return (
             <g key={bar.label}>
+              {/* A comparação vem primeiro e à esquerda: passado antes do presente. */}
+              {agrupado && alturaCompare > 0 ? (
+                <rect
+                  fill={compareFill}
+                  height={alturaCompare}
+                  rx="1"
+                  width={w}
+                  x={x}
+                  y={height - alturaCompare}
+                />
+              ) : null}
               {topo > 0 ? (
                 <rect
                   fill={stackedFill}
                   height={topo}
                   rx="1"
                   width={w}
-                  x={x}
+                  x={agrupado ? x + w * 1.15 : x}
                   y={height - base - topo}
                 />
               ) : null}
@@ -88,7 +114,7 @@ export function BarChart({
                   height={base}
                   rx="1"
                   width={w}
-                  x={x}
+                  x={agrupado ? x + w * 1.15 : x}
                   y={height - base}
                 />
               ) : null}
@@ -109,7 +135,7 @@ export function BarChart({
         {bars.map((bar) => (
           <div className="text-center" key={bar.label}>
             <p className="truncate text-[10px] font-semibold text-zinc-700">
-              {bar.value > 0 || (bar.stacked ?? 0) > 0
+              {bar.value > 0 || (bar.stacked ?? 0) > 0 || (bar.compare ?? 0) > 0
                 ? formatValue(bar.value)
                 : "–"}
             </p>
@@ -124,29 +150,23 @@ export function BarChart({
   );
 }
 
-/** Legenda das duas cores, para a pilha não virar adivinhação. */
+/** Legenda das cores, para a pilha ou o par não virarem adivinhação. */
 export function BarChartLegend({
-  base,
-  stacked,
-  stackedFill = "#99f6e4",
+  itens,
 }: {
-  base: string;
-  stacked: string;
-  stackedFill?: string;
+  itens: { color: string; label: string }[];
 }) {
   return (
     <div className="mt-2 flex flex-wrap gap-3 text-xs text-zinc-500">
-      <span className="flex items-center gap-1.5">
-        <span className="h-2.5 w-2.5 rounded-sm bg-teal-700" />
-        {base}
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span
-          className="h-2.5 w-2.5 rounded-sm"
-          style={{ backgroundColor: stackedFill }}
-        />
-        {stacked}
-      </span>
+      {itens.map((item) => (
+        <span className="flex items-center gap-1.5" key={item.label}>
+          <span
+            className="h-2.5 w-2.5 rounded-sm"
+            style={{ backgroundColor: item.color }}
+          />
+          {item.label}
+        </span>
+      ))}
     </div>
   );
 }

@@ -24,6 +24,26 @@ const MESES_CURTOS = [
   "jul", "ago", "set", "out", "nov", "dez",
 ];
 
+/**
+ * Rótulo de variação: "↑12%", "↓8%", "=".
+ *
+ * `null` quando não há base — sair de zero não é "aumento de 100%", é a
+ * primeira entrada, e um percentual ali inventaria significado.
+ */
+function variacao(pontos: number | null) {
+  if (pontos === null) return undefined;
+  if (pontos === 0) return "=";
+
+  return `${pontos > 0 ? "↑" : "↓"}${Math.abs(pontos)}%`;
+}
+
+/** Variação de um valor contra outro, para o comparativo entre anos. */
+function variacaoContra(atual: number, anterior: number) {
+  if (anterior <= 0) return undefined;
+
+  return variacao(Math.round(((atual - anterior) / anterior) * 100));
+}
+
 /** Quanto do bruto já entrou, em pontos percentuais inteiros. */
 function percentual(parte: number, total: number) {
   return total > 0 ? Math.round((parte / total) * 100) : 0;
@@ -75,6 +95,9 @@ export default async function RelatoriosPage({
   if (showValues) csvParams.set("valores", "1");
 
   const temHistorico = relatorio.yearly.length > 1;
+  const temAnoAnterior = relatorio.yearly.some(
+    (linha) => linha.year === filtros.year - 1,
+  );
   const aReceber =
     Math.round((relatorio.totals.value - relatorio.totals.received) * 100) / 100;
 
@@ -236,6 +259,23 @@ export default async function RelatoriosPage({
                 </article>
               </section>
 
+              <section className="rounded-lg border border-zinc-200 bg-white p-4">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div>
+                    <p className="text-sm text-zinc-500">
+                      Recebido acumulado, desde o início
+                    </p>
+                    <strong className="mt-1 block text-2xl">
+                      {formatCurrency(relatorio.allTimeReceived)}
+                    </strong>
+                  </div>
+                  <p className="text-sm text-zinc-500">
+                    de {formatCurrency(relatorio.allTimeGross)} lançados ·{" "}
+                    {percentual(relatorio.allTimeReceived, relatorio.allTimeGross)}%
+                  </p>
+                </div>
+              </section>
+
               <section className="rounded-lg border border-zinc-200 bg-white p-4 print:break-inside-avoid">
                 <h2 className="text-base font-semibold">
                   Recebimentos por mês · {filtros.year}
@@ -244,18 +284,55 @@ export default async function RelatoriosPage({
                   <BarChart
                     bars={relatorio.monthly.map((linha) => ({
                       label: MESES_CURTOS[linha.month - 1],
-                      secondary:
-                        linha.toReceive > 0
-                          ? `+${formatCurrency(linha.toReceive)}`
-                          : undefined,
+                      // A variação vale mais que o valor pendente aqui: o
+                      // pendente já está desenhado na barra clara.
+                      secondary: variacao(linha.changeFromPreviousMonth),
                       stacked: linha.toReceive,
                       value: linha.received,
                     }))}
                     formatValue={(valor) => formatCurrency(valor)}
                   />
                 </div>
-                <BarChartLegend base="Recebido" stacked="A receber" />
+                <BarChartLegend
+                  itens={[
+                    { color: "#0f766e", label: "Recebido" },
+                    { color: "#99f6e4", label: "A receber" },
+                  ]}
+                />
               </section>
+
+              {/*
+                Mês a mês, ano contra ano. Barras pareadas em vez de duas linhas
+                separadas: a pergunta é "março deste ano rendeu mais que março
+                do ano passado?", e a resposta precisa estar lado a lado.
+              */}
+              {temAnoAnterior ? (
+                <section className="rounded-lg border border-zinc-200 bg-white p-4 print:break-inside-avoid">
+                  <h2 className="text-base font-semibold">
+                    {filtros.year} vs {filtros.year - 1}, mês a mês
+                  </h2>
+                  <div className="mt-3">
+                    <BarChart
+                      bars={relatorio.monthly.map((linha) => ({
+                        compare: linha.previousYearReceived,
+                        label: MESES_CURTOS[linha.month - 1],
+                        secondary: variacaoContra(
+                          linha.received,
+                          linha.previousYearReceived,
+                        ),
+                        value: linha.received,
+                      }))}
+                      formatValue={(valor) => formatCurrency(valor)}
+                    />
+                  </div>
+                  <BarChartLegend
+                    itens={[
+                      { color: "#a1a1aa", label: String(filtros.year - 1) },
+                      { color: "#0f766e", label: String(filtros.year) },
+                    ]}
+                  />
+                </section>
+              ) : null}
 
               {temHistorico ? (
                 <section className="rounded-lg border border-zinc-200 bg-white p-4 print:break-inside-avoid">
@@ -276,7 +353,12 @@ export default async function RelatoriosPage({
                       formatValue={(valor) => formatCurrency(valor)}
                     />
                   </div>
-                  <BarChartLegend base="Recebido" stacked="A receber" />
+                  <BarChartLegend
+                  itens={[
+                    { color: "#0f766e", label: "Recebido" },
+                    { color: "#99f6e4", label: "A receber" },
+                  ]}
+                />
                 </section>
               ) : null}
             </>
