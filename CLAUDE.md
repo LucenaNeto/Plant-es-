@@ -9,10 +9,23 @@
 - O `.env` aponta para o **Supabase de produção**. Nenhum comando que escreva no banco
   (`prisma migrate deploy`, `prisma db push`, `prisma migrate reset`) deve ser executado
   automaticamente. Escrever o arquivo de migration é permitido; aplicá-lo não.
-- **`connection_limit=1` na `DATABASE_URL` não é opcional.** O padrão do Prisma é
-  (núcleos × 2 + 1) conexões por processo — 17 numa máquina de 8 núcleos — contra um
-  pool de 15 no Supabase em session mode. Sem o limite, um único `npm run dev` esgota
-  o pool e derruba produção junto (`FATAL (EMAXCONNSESSION)`). Já aconteceu.
+- **A `DATABASE_URL` usa a porta 6543 com `?pgbouncer=true&connection_limit=1`.**
+  Nenhuma das três partes é opcional, e cada uma tem uma cicatriz:
+  - **Porta 6543 (transaction mode).** Em session mode (5432) cada instância
+    serverless prende uma conexão pela vida inteira dela; a Vercel cria quantas
+    quiser, e 15 esgotam o pool. Derrubou produção em 2026-09-06 com
+    `FATAL (EMAXCONNSESSION)`. `connection_limit=1` **não** resolve isso — ele
+    limita por instância, e o número de instâncias é ilimitado.
+  - **`pgbouncer=true`** desliga prepared statements. Sem ele, sob concorrência,
+    quebra com `prepared statement "sN" does not exist` (medido: 12 falhas em 12
+    clientes).
+  - **`connection_limit=1`** porque o padrão do Prisma é (núcleos × 2 + 1) — 17
+    numa máquina de 8 núcleos.
+  - A `DIRECT_URL` continua na **5432 sem parâmetros**: migrations precisam de
+    sessão dedicada para DDL.
+- **Agrupe consultas em `$transaction`.** O custo do `pgbouncer=true` é pago por
+  transação, não por consulta: quatro consultas soltas custam ~1130ms; agrupadas,
+  ~630ms. É o que torna o transaction mode viável (medido, 2026-09-06).
 - Scripts de verificação abrem conexão: rode um de cada vez, sempre com
   `$disconnect()` em `finally`, e encerre servidores locais antes.
 
