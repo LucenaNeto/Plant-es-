@@ -94,12 +94,6 @@ export function expensesQuery(userId: string, filters: ExpenseFilters) {
   });
 }
 
-export async function listExpenses(userId: string, filters: ExpenseFilters) {
-  const expenses = await expensesQuery(userId, filters);
-
-  return expenses.map(serializeExpense);
-}
-
 export async function findExpense(userId: string, expenseId: string) {
   const expense = await prisma.expense.findFirst({
     include: WITH_LINKS,
@@ -238,13 +232,6 @@ export function buildExpenseSummary(
     count: byCategory.reduce((sum, row) => sum + row.count, 0),
     total: byCategory.reduce((sum, row) => sum + row.amount, 0),
   };
-}
-
-export async function summarizeExpenses(
-  userId: string,
-  filters: ExpenseFilters,
-) {
-  return buildExpenseSummary(await expenseSummaryQuery(userId, filters));
 }
 
 export type ExpenseSummary = ReturnType<typeof buildExpenseSummary>;

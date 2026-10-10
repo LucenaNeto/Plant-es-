@@ -101,24 +101,6 @@ export function filterByPaymentStatus(
     : shifts;
 }
 
-export async function listShifts(userId: string, filters: ShiftFilters) {
-  const shifts = await monthShiftsQuery(userId, filters);
-
-  return filterByPaymentStatus(
-    shifts.map(serializeShift),
-    filters.paymentStatus,
-  );
-}
-
-export async function findShift(userId: string, shiftId: string) {
-  const shift = await prisma.shift.findFirst({
-    include: WITH_UNIT_NAME,
-    where: { id: shiftId, userId },
-  });
-
-  return shift ? serializeShift(shift) : null;
-}
-
 /**
  * Plantões do usuário que colidem no tempo com o informado.
  *
@@ -509,31 +491,7 @@ export function buildScheduleWindow(
   };
 }
 
-export async function getScheduleWindow(userId: string, upcomingLimit = 4) {
-  return buildScheduleWindow(await scheduleQuery(userId), upcomingLimit);
-}
-
 export type ScheduleWindow = ReturnType<typeof buildScheduleWindow>;
-
-/**
- * Próximo plantão a partir de hoje, para o destaque do dashboard.
- *
- * "Hoje" vem de `todayAsCalendarDate()`, que lê o fuso do app e não o do
- * processo: na Vercel (UTC), depois das 21h de Brasília o servidor já está no
- * dia seguinte e o plantão desta noite seria descartado como passado.
- *
- * Compara por data, não por horário: um plantão que começou às 19h de hoje e
- * ainda está em andamento continua sendo "o próximo" até o dia virar.
- */
-export async function findNextShift(userId: string) {
-  const shift = await prisma.shift.findFirst({
-    include: WITH_UNIT_NAME,
-    orderBy: [{ shiftDate: "asc" }, { startTime: "asc" }],
-    where: { shiftDate: { gte: todayAsCalendarDate() }, userId },
-  });
-
-  return shift ? serializeShift(shift) : null;
-}
 
 /**
  * Totais do mês filtrado, para o cabeçalho da lista.
@@ -578,12 +536,6 @@ export function summarizeSerializedShifts(shifts: SerializedShift[]) {
   }
 
   return summary;
-}
-
-export async function summarizeShifts(userId: string, filters: ShiftFilters) {
-  const shifts = await monthShiftsQuery(userId, filters);
-
-  return summarizeSerializedShifts(shifts.map(serializeShift));
 }
 
 export type ShiftSummary = ReturnType<typeof summarizeSerializedShifts>;

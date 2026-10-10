@@ -111,15 +111,6 @@ export function buildRules(
   return rules.map((rule) => serializeRule(rule, horizonte.get(rule.id) ?? null));
 }
 
-export async function listRules(userId: string): Promise<SerializedRule[]> {
-  const [rules, horizons] = await Promise.all([
-    rulesQuery(userId),
-    ruleHorizonQuery(userId),
-  ]);
-
-  return buildRules(rules, horizons);
-}
-
 /**
  * Cria a regra a partir do plantão que o usuário acabou de lançar.
  *

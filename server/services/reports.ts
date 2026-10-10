@@ -326,9 +326,3 @@ export function reportYearsQuery(userId: string) {
     FROM "Shift" WHERE "userId" = ${userId} ORDER BY 1 DESC
   `;
 }
-
-export async function listReportYears(userId: string) {
-  const linhas = await reportYearsQuery(userId);
-
-  return linhas.map((l) => l.ano);
-}
