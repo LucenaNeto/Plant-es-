@@ -1,0 +1,60 @@
+name: Verificação
+
+# Roda em todo push e em toda abertura de pull request. O objetivo é que
+# nenhuma branch chegue ao `main` sem passar por tipos, lint, testes e build —
+# as quatro coisas que até agora dependiam de alguém lembrar de rodar na mão.
+on:
+  push:
+    branches-ignore:
+      # O push na branch que já tem PR aberto rodaria duas vezes a mesma coisa.
+      - "gh-readonly-queue/**"
+  pull_request:
+  workflow_dispatch:
+
+# Push seguido de push na mesma branch: só o último interessa.
+concurrency:
+  group: verificacao-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Nenhum passo aqui toca o banco: os testes cobrem lógica pura e o build
+    # do Next não consulta nada. A URL é um valor de brinquedo, suficiente
+    # para o Prisma Client ser construído sem reclamar de variável ausente, e
+    # deliberadamente apontando para lugar nenhum — se algum teste futuro
+    # tentar consultar de verdade, ele falha aqui em vez de alcançar produção.
+    env:
+      DATABASE_URL: "postgresql://ci:ci@127.0.0.1:5432/ci?schema=public"
+      DIRECT_URL: "postgresql://ci:ci@127.0.0.1:5432/ci?schema=public"
+      AUTH_SECRET: "ci-nao-usa-sessao-de-verdade"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      # O postinstall já roda `prisma generate`, mas um cache de node_modules
+      # restaurado pula o postinstall e deixa o client desatualizado.
+      - name: Gerar o Prisma Client
+        run: npx prisma generate
+
+      - name: Tipos
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint .
+
+      - name: Testes
+        run: npm test
+
+      - name: Build
+        run: npm run build

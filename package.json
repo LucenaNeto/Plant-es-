@@ -9,7 +9,10 @@
     "start": "next start",
     "lint": "eslint",
     "backup": "tsx scripts/backup/exportar.mts",
-    "backup:restaurar": "tsx scripts/backup/restaurar.mts"
+    "backup:restaurar": "tsx scripts/backup/restaurar.mts",
+    "test": "node --import tsx --test \"tests/**/*.test.ts\"",
+    "test:watch": "node --import tsx --test --watch \"tests/**/*.test.ts\"",
+    "verificar": "tsc --noEmit && eslint . && node --import tsx --test \"tests/**/*.test.ts\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
