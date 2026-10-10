@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/db/prisma";
 import { serializeExpense } from "@/lib/expenses/serializer";
 import { serializeShift } from "@/lib/shifts/serializer";
 import { serializeUnit } from "@/lib/units/serializer";
@@ -29,21 +30,26 @@ import {
 import { unitsQuery } from "@/server/services/units";
 
 /**
- * Carregadores de tela: cada página pede ao banco o mínimo de vezes possível.
+ * Carregadores de tela: cada página pede ao banco o mínimo de vezes possível,
+ * e numa transação só.
  *
- * **O que custa caro é o número de idas ao banco, não o número de consultas
- * por ida.** Com `connection_limit=1` nada paraleliza de verdade — um
- * `Promise.all` só enfileira na única conexão — então cada consulta é uma
- * viagem. Medido em 2026-10-10 contra a produção, uma viagem custa ~58ms, e
- * quatro consultas custam ~4 viagens de qualquer jeito (`scripts/verificar/
- * estrategias.mts`).
+ * **Duas economias diferentes, e as duas importam.**
  *
- * **Daí o trabalho aqui ser remover consultas, não embrulhá-las.** A tela de
- * plantões buscava o mesmo mês duas vezes — uma para a lista, outra para os
- * totais, mudando só o `select` — e pedia as regras em dois passos. São cinco
- * viagens que viraram quatro, com a lista e os totais saindo do mesmo
- * resultado. `$transaction` faria o contrário: ela acrescenta BEGIN e COMMIT,
- * duas viagens a mais, sem acelerar nada (medido: 5.9 viagens contra 3.9).
+ * A primeira é gastar menos consultas. A tela de plantões buscava o mesmo mês
+ * duas vezes — uma para a lista, outra para os totais, mudando só o `select` —
+ * e pedia as regras em dois passos encadeados. Cinco consultas viraram quatro,
+ * com a lista e os totais saindo do mesmo resultado.
+ *
+ * A segunda é mandar as que sobraram juntas. Com o pooler em transaction mode
+ * (porta 6543, `pgbouncer=true`), o custo é cobrado **por transação**, e uma
+ * consulta solta é uma transação implícita: ~300ms cada. Agrupadas num
+ * `$transaction`, as quatro custam ~550ms em vez de ~1200ms (medido em
+ * 2026-10-10 contra a produção, `scripts/verificar/estrategias.mts`).
+ *
+ * **Cuidado ao remedir.** Rodar essa medição numa `DATABASE_URL` na porta 5432
+ * dá a resposta oposta — lá `$transaction` só acrescenta BEGIN e COMMIT, e
+ * parece custar duas viagens a mais. Eu caí nessa hoje. A medição só vale com
+ * a URL que a produção usa.
  *
  * **Por que um módulo separado.** As páginas não podem falar com o Prisma: a
  * camada de página é só render. E fazer `shifts.ts` importar `units.ts` e
@@ -53,10 +59,9 @@ import { unitsQuery } from "@/server/services/units";
  * monta o resultado pelas mesmas funções puras que eles já usam — a regra de
  * negócio continua num lugar só.
  */
-
 /** Plantões: lista, filtros, totais do mês e regras de repetição. */
 export async function getShiftsScreen(userId: string, filters: ShiftFilters) {
-  const [shifts, units, rules, horizons] = await Promise.all([
+  const [shifts, units, rules, horizons] = await prisma.$transaction([
     monthShiftsQuery(userId, filters),
     unitsQuery(userId),
     rulesQuery(userId),
@@ -77,7 +82,7 @@ export async function getShiftsScreen(userId: string, filters: ShiftFilters) {
 
 /** Agenda: a grade do mês e as unidades ativas para o lançamento rápido. */
 export async function getAgendaScreen(userId: string, filters: ShiftFilters) {
-  const [shifts, units] = await Promise.all([
+  const [shifts, units] = await prisma.$transaction([
     monthShiftsQuery(userId, filters),
     unitsQuery(userId, { onlyActive: true }),
   ]);
@@ -96,7 +101,7 @@ export async function getExpensesScreen(
   userId: string,
   filters: ExpenseFilters,
 ) {
-  const [expenses, units, grouped, shifts] = await Promise.all([
+  const [expenses, units, grouped, shifts] = await prisma.$transaction([
     expensesQuery(userId, filters),
     unitsQuery(userId),
     expenseSummaryQuery(userId, filters),
@@ -122,7 +127,7 @@ export async function getReportsScreen(
   userId: string,
   filters: ReportFilters,
 ) {
-  const [user, shifts, serie, units, years] = await Promise.all([
+  const [user, shifts, serie, units, years] = await prisma.$transaction([
     reportUserQuery(userId),
     reportShiftsQuery(userId, filters),
     reportSeriesQuery(userId, filters),

@@ -308,7 +308,7 @@ export function buildReport(
 }
 
 export async function getReport(userId: string, filters: ReportFilters) {
-  const [user, shifts, serie] = await Promise.all([
+  const [user, shifts, serie] = await prisma.$transaction([
     reportUserQuery(userId),
     reportShiftsQuery(userId, filters),
     reportSeriesQuery(userId, filters),

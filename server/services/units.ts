@@ -32,9 +32,9 @@ function toDecimal(value: number | null | undefined) {
  *
  * Existe para que uma tela que também precisa de plantões ou gastos possa
  * mandar tudo numa `$transaction` só. Com `connection_limit=1` as consultas
- * não paralelizam de verdade — um `Promise.all` só enfileira —, e o custo do
- * `pgbouncer=true` é cobrado por transação, não por consulta (ver CLAUDE.md).
- * Agrupar é, na prática, a diferença entre uma ida ao banco e quatro.
+ * não paralelizam — um `Promise.all` só enfileira na única conexão — e o custo
+ * do `pgbouncer=true` é cobrado por transação, não por consulta. Agrupar é, na
+ * prática, a diferença entre uma ida ao banco e quatro (ver CLAUDE.md).
  */
 export function unitsQuery(
   userId: string,

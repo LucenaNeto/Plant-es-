@@ -235,7 +235,7 @@ export async function getMonthlyFinance(
   year: number,
   month: number,
 ) {
-  const [shifts, expenses] = await Promise.all([
+  const [shifts, expenses] = await prisma.$transaction([
     ...financeQueries(userId, year, month),
   ]);
 

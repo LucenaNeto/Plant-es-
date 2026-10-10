@@ -1,84 +1,114 @@
 # Plantões+
 
-App mobile-first para organização pessoal de plantões e controle financeiro operacional de profissionais da saúde.
+App mobile-first para um profissional de saúde organizar os próprios plantões e
+o financeiro operacional deles: a escala do mês, quanto cada plantão rende,
+quanto já entrou e quanto ainda falta receber.
 
-## Primeira entrega
+Em produção na Vercel, com Postgres no Supabase. Uso pessoal, uma conta.
 
-- Next.js 16 com TypeScript e Tailwind CSS.
-- Estrutura inicial de rotas públicas e privadas.
-- Layout base mobile-first com navegação inferior fixa.
-- Páginas iniciais de login, cadastro, recuperação de senha, dashboard, agenda, plantões, unidades, gastos, finanças e perfil.
-- Prisma configurado com schema inicial para usuários, unidades, plantões, recorrência e gastos.
-- `.env.example` sem segredos reais.
+## ⚠️ Antes de rodar qualquer comando de banco
 
-## Getting Started
+**O `.env` aponta para a produção.** Não há banco de homologação. Isso significa
+que estes comandos escrevem nos dados reais e não devem ser rodados por
+impulso:
 
-Instale as dependências e rode o servidor local:
+```
+prisma migrate dev        prisma migrate deploy
+prisma db push            prisma migrate reset
+```
+
+Escrever o arquivo de migration é seguro; aplicá-lo é a parte que exige
+decisão. As regras completas estão no [CLAUDE.md](CLAUDE.md), que vale tanto
+para quem programa quanto para agente.
+
+Antes de qualquer migration arriscada:
+
+```bash
+npm run backup
+```
+
+## Rodar local
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Variáveis necessárias no `.env` (modelo em `.env.example`):
 
-## Banco de dados
+| Variável | Para quê |
+|---|---|
+| `DATABASE_URL` | Conexão poolada, **porta 6543 com `?pgbouncer=true&connection_limit=1`** |
+| `DIRECT_URL` | Conexão direta, **porta 5432 sem parâmetros** — só migrations usam |
+| `AUTH_SECRET` | Assinatura da sessão |
+| `AUTH_TRUST_HOST` | `true` |
 
-Configure `DATABASE_URL` em `.env` antes de executar migrations do Prisma.
+As três partes da `DATABASE_URL` não são opcionais, e cada uma tem uma
+cicatriz: session mode derrubou a produção em setembro, sem `pgbouncer=true` as
+consultas quebram sob concorrência, e sem `connection_limit=1` o Prisma abre
+dezessete conexões por instância. O [CLAUDE.md](CLAUDE.md) conta a história de
+cada uma.
+
+## Verificar
 
 ```bash
-npx prisma generate
-npx prisma migrate dev
+npm run verificar    # tipos + lint + testes
+npm test             # só os testes
+npm run build
 ```
 
-## Rotas iniciais
+São 132 testes de lógica pura — datas, identidades contábeis, validação,
+redação de PII no logger — e nenhum toca o banco. Rodam em menos de um segundo.
+O mesmo conjunto roda no CI em todo push e todo PR.
 
-- `/login`
-- `/cadastro`
-- `/recuperar-senha`
-- `/dashboard`
-- `/agenda`
-- `/plantoes`
-- `/unidades`
-- `/gastos`
-- `/financas`
-- `/perfil`
+Para medir desempenho contra o banco real, veja
+[`scripts/verificar/`](scripts/verificar/README.md). São scripts de leitura;
+rode um de cada vez, com o servidor local parado.
+
+## Como o código é organizado
+
+```
+app/(private)/*/page.tsx   →  render, sem regra de negócio
+app/**/actions.ts          →  Server Actions: auth + validação + chamada de serviço
+app/api/**/route.ts        →  REST: auth + validação + chamada de serviço
+server/services/*.ts       →  regra de negócio; não conhece HTTP
+server/services/screens.ts →  junta as consultas que cada tela precisa
+lib/                       →  utilitários puros, sem I/O
+```
+
+Duas regras que atravessam tudo:
+
+- **Todo serviço recebe `userId` como primeiro parâmetro e o inclui no
+  `where`.** É o que garante o isolamento entre contas.
+- **Nenhum `Decimal` ou `Date` do Prisma cruza a fronteira servidor→cliente.**
+  Datas de calendário passam todas por `lib/dates/calendar-date.ts`, com fuso
+  UTC fixo — formatar com fuso local mostra o dia anterior.
+
+## O que o app faz
+
+- **Agenda** — calendário mensal, lançamento tocando no dia, plantão semanal
+  recorrente, duplicação em lote.
+- **Plantões** — ciclo de recebimento (previsto → pendente → recebido), repasse
+  de uma ocorrência a outra pessoa, detecção de sobreposição de horário.
+- **Unidades** — valores e carga padrão que preenchem o lançamento sozinhos.
+- **Gastos** — operacionais, gerais ou vinculados a unidade e plantão.
+- **Finanças** — bruto, recebido, a receber e líquido do mês, por unidade.
+- **Relatórios** — operacional e financeiro, gráficos de horas, comparativo
+  mês a mês e ano a ano, exportação em CSV e TXT.
+
+## Documentação
+
+| Arquivo | O que tem |
+|---|---|
+| [CLAUDE.md](CLAUDE.md) | Convenções e as decisões que custaram caro |
+| [docs/BACKLOG.md](docs/BACKLOG.md) | O que está parado esperando decisão |
+| [docs/BACKUP.md](docs/BACKUP.md) | Backup diário e como restaurar |
+| [docs/MIGRACAO-REGIAO.md](docs/MIGRACAO-REGIAO.md) | A troca de região do banco e o que ela mediu |
+| [docs/ROADMAP-MVP.md](docs/ROADMAP-MVP.md) | Histórico dos blocos do MVP |
 
 ## Segurança
 
-Não versionar `.env`, `DATABASE_URL`, `AUTH_SECRET` ou qualquer segredo. Todas as futuras consultas privadas devem filtrar por `userId` no servidor.
-
-## Próximo bloco
-
-Implementar cadastro de unidades, listagem, edição, inativação, unidade fixa e valores padrão.
-
-## Autenticação
-
-O Bloco 2 usa Auth.js com provider de credenciais, `bcryptjs` para hash de senha e Prisma para persistência do usuário.
-
-- Cadastro: `POST /api/auth/register`
-- Sessão Auth.js: `/api/auth/[...nextauth]`
-- Usuário autenticado: `GET /api/auth/me`
-- Perfil: `GET /api/users/me` e `PATCH /api/users/me`
-- Rotas privadas protegidas por `proxy.ts`
-
-As rotas privadas redirecionam para `/login` quando não há sessão ativa.
-
-Para autenticação funcionar em local e Vercel, configure:
-
-```bash
-AUTH_SECRET="uma-chave-forte"
-AUTH_TRUST_HOST=true
-```
-
-## Unidades
-
-O Bloco 3 implementa cadastro de unidades com isolamento por usuário.
-
-- Listar unidades: `GET /api/units`
-- Criar unidade: `POST /api/units`
-- Buscar unidade: `GET /api/units/:id`
-- Editar unidade: `PATCH /api/units/:id`
-- Inativar unidade: `DELETE /api/units/:id`
-
-Todas as operações privadas validam sessão no servidor e filtram os dados por `userId`.
+Não versionar `.env` nem nenhum segredo. **O repositório é público** — o que
+significa que backup, dump e log não podem sair daqui em claro: o workflow de
+backup criptografa antes de guardar, e o logger redige e-mail, telefone e senha
+automaticamente.
