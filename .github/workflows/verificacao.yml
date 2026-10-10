@@ -47,6 +47,13 @@ jobs:
       - name: Gerar o Prisma Client
         run: npx prisma generate
 
+      # `tsc` sozinho falha num checkout limpo: tipos como `LayoutProps` são
+      # gerados pelo Next a partir das rotas, e sem eles o erro é
+      # "Cannot find name 'LayoutProps'" — que não é erro de código nenhum.
+      # `typegen` produz esses tipos sem pagar um build inteiro.
+      - name: Gerar os tipos de rota
+        run: npx next typegen
+
       - name: Tipos
         run: npx tsc --noEmit
 
