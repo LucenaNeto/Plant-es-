@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import {
+  calculateShiftHours,
   formatShortDate,
   toDateInputValue,
   todayAsCalendarDate,
@@ -222,14 +223,29 @@ export async function generateShifts(
   };
 }
 
-/** Duração em Decimal, replicando a regra de `calculateShiftHours`. */
+/**
+ * Duração em `Decimal`, para gravar em `Shift.hours`.
+ *
+ * Chama `calculateShiftHours` em vez de repetir a conta. A versão anterior
+ * reimplementava a regra inteira aqui — inclusive a virada de meia-noite — com
+ * um comentário dizendo que estava "replicando". Duas implementações da mesma
+ * regra não ficam iguais para sempre: bastaria alguém corrigir a de lá para o
+ * plantão recorrente passar a gravar uma duração diferente da do plantão
+ * lançado à mão, pelos mesmos horários.
+ *
+ * Horário malformado aqui é bug, não entrada de usuário: o Zod validou quando
+ * a regra foi criada. Por isso explode em vez de devolver zero em silêncio.
+ */
 function hoursBetween(startTime: string, endTime: string) {
-  const [h1, m1] = startTime.split(":").map(Number);
-  const [h2, m2] = endTime.split(":").map(Number);
-  const bruto = h2 * 60 + m2 - (h1 * 60 + m1);
-  const minutos = bruto > 0 ? bruto : bruto + 24 * 60;
+  const horas = calculateShiftHours(startTime, endTime);
 
-  return new Prisma.Decimal(Math.round((minutos / 60) * 100) / 100);
+  if (horas === null) {
+    throw new Error(
+      `Horário inválido na regra de repetição: ${startTime}-${endTime}`,
+    );
+  }
+
+  return new Prisma.Decimal(horas);
 }
 
 /**
