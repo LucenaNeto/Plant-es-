@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useOptimistic } from "react";
 import {
   deleteShiftAction,
   setPaymentStatusAction,
@@ -29,6 +29,19 @@ const NEXT_STATUS = {
   received: null,
 } as const;
 
+/**
+ * Atualização otimista da situação de pagamento.
+ *
+ * Marcar como recebido é a ação mais repetida do app, e até agora ela custava
+ * a ida ao servidor **mais** o recarregamento da tela inteira — meio segundo
+ * no celular, durante o qual o selo continuava dizendo "previsto" e o botão
+ * dizia "Salvando...". A pessoa fica olhando para um estado que ela sabe que
+ * já mudou.
+ *
+ * `useOptimistic` troca o selo no toque. Se a action falhar, o React descarta
+ * o valor otimista sozinho e o selo volta ao que era — e a mensagem de erro
+ * que já existia aparece logo acima dos botões, explicando a volta.
+ */
 export function ShiftCard({
   onDuplicate,
   onEdit,
@@ -47,7 +60,11 @@ export function ShiftCard({
     null,
   );
 
-  const next = NEXT_STATUS[shift.paymentStatus];
+  const [paymentStatus, setOptimisticStatus] = useOptimistic(
+    shift.paymentStatus,
+  );
+
+  const next = NEXT_STATUS[paymentStatus];
   const failure =
     statusState && !statusState.ok
       ? statusState.message
@@ -84,9 +101,9 @@ export function ShiftCard({
         ) : null}
         {shift.isHandedOff ? null : (
           <span
-            className={`rounded-md px-2.5 py-1 ${PAYMENT_STATUS_STYLES[shift.paymentStatus]}`}
+            className={`rounded-md px-2.5 py-1 ${PAYMENT_STATUS_STYLES[paymentStatus]}`}
           >
-            {PAYMENT_STATUS_LABELS[shift.paymentStatus]}
+            {PAYMENT_STATUS_LABELS[paymentStatus]}
           </span>
         )}
       </div>
@@ -150,14 +167,21 @@ export function ShiftCard({
             Fora da receita
           </span>
         ) : next ? (
-          <form action={statusAction}>
+          <form
+            action={(formData) => {
+              // Dentro da action do formulário, que é uma transição — é onde
+              // o React aceita um valor otimista e sabe quando descartá-lo.
+              setOptimisticStatus(next.value);
+              statusAction(formData);
+            }}
+          >
             <input name="paymentStatus" type="hidden" value={next.value} />
             <button
               className="min-h-10 w-full rounded-md bg-teal-600 px-2 font-semibold text-white disabled:opacity-60"
               disabled={isChangingStatus}
               type="submit"
             >
-              {isChangingStatus ? "Salvando..." : next.label}
+              {next.label}
             </button>
           </form>
         ) : (

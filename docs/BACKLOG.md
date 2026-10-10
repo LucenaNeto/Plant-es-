@@ -246,15 +246,19 @@ anda junto com o 4.3.
 
 ---
 
-## 6. Interação — o que eu faria em seguida
+## 6. Interação
 
-Não precisa de decisão de produto, mas também não fiz hoje para não acumular
-mudança não revisada:
-
-- **Atualização otimista no card do plantão.** Marcar como recebido hoje espera
-  a ida ao servidor e o recarregamento da tela. O selo poderia mudar na hora e
-  voltar atrás se falhasse.
 - **Confirmação de exclusão sem `window.confirm`.** O diálogo nativo do
-  navegador no celular é feio e fácil de errar o toque.
+  navegador no celular é feio e fácil de errar o toque. Trocar por um painel
+  dentro do card é mudança de gosto visual, então prefiro que você escolha.
 - **Mês anterior e próximo pré-carregados na agenda.** O gesto mais comum ali é
-  navegar entre meses vizinhos, e cada um custa uma ida ao servidor.
+  navegar entre meses vizinhos, e cada um custa uma ida ao servidor. Fazer isso
+  de verdade exige `cacheComponents` e `partialPrefetching` do Next 16.4, que
+  mudam como **toda** página renderiza e é cacheada. Num app onde a tela mostra
+  quanto você tem a receber, servir dado de alguns segundos atrás é decisão de
+  produto, não de implementação. **Decisão sua.**
+
+A atualização otimista do selo de pagamento foi feita — está em
+`features/shifts/shift-card.tsx`. É a única mudança de hoje que eu **não**
+consegui ver rodando: testá-la exige login, e login exige uma conta que eu não
+tenho. Vale ser a primeira coisa que você abre no localhost.
