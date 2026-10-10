@@ -1,0 +1,72 @@
+name: Backup do banco
+
+# Roda todo dia às 06:00 UTC (03:00 em Brasília) e sob demanda pelo botão
+# "Run workflow" na aba Actions.
+#
+# O horário não é só preferência: o agendamento do GitHub é best-effort e pode
+# atrasar em horários de pico. 06:00 UTC é um vale.
+#
+# Efeito colateral deliberado: a rotina toca o banco todo dia, o que impede o
+# Supabase de pausar o projeto por inatividade — foi exatamente o que derrubou
+# o app entre setembro e outubro de 2026.
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    # Um backup que trava não pode consumir minutos indefinidamente.
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar o Prisma Client
+        run: npx prisma generate
+
+      - name: Exportar o banco
+        env:
+          # Use a URL na porta 5432 (sessão), sem pgbouncer: este script roda
+          # uma transação longa de leitura, e o transaction mode do pooler
+          # desliga prepared statements sem ganho nenhum aqui.
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: npx tsx scripts/backup/exportar.mts --saida backup.json
+
+      - name: Criptografar
+        env:
+          SENHA: ${{ secrets.BACKUP_PASSPHRASE }}
+        # O repositório é PÚBLICO: artefato sem criptografia aqui seria publicar
+        # e-mails e hashes de senha dos usuários. A senha nunca vai para a linha
+        # de comando (ficaria visível na lista de processos) — vai pelo stdin.
+        run: |
+          if [ -z "$SENHA" ]; then
+            echo "ERRO: o segredo BACKUP_PASSPHRASE não está definido."
+            echo "Sem ele o backup sairia em claro num repositório público."
+            exit 1
+          fi
+          printf '%s' "$SENHA" | gpg --batch --yes --symmetric \
+            --cipher-algo AES256 \
+            --passphrase-fd 0 \
+            --output backup.json.gpg backup.json
+          rm -f backup.json
+          ls -lh backup.json.gpg
+
+      - name: Guardar o artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ github.run_number }}
+          path: backup.json.gpg
+          # 90 dias é o teto do plano gratuito. Com execução diária, isso
+          # mantém uma janela de três meses de pontos de restauração.
+          retention-days: 90
+          if-no-files-found: error

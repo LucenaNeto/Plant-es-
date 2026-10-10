@@ -42,3 +42,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Backups: contem e-mails e hashes de senha. Nunca versionar.
+/backups
+backup.json
+backup.json.gpg

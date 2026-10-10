@@ -7,7 +7,9 @@
     "build": "next build",
     "postinstall": "prisma generate",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "backup": "tsx scripts/backup/exportar.mts",
+    "backup:restaurar": "tsx scripts/backup/restaurar.mts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -31,6 +33,7 @@
     "eslint-config-next": "16.3.1",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "tsx": "^4.20.6"
   }
 }
