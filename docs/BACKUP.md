@@ -80,6 +80,27 @@ Grava em `backups/plantoes-AAAA-MM-DD.json`, **sem criptografia e sem
 versionamento** (`/backups` está no `.gitignore`). Útil antes de uma migration
 arriscada. Apague depois: o arquivo em claro tem e-mails e hashes.
 
+## Verificação feita
+
+O ciclo completo foi testado em 2026-10-10 contra a produção, restaurando num
+**schema isolado** (`?schema=backup_teste`) no mesmo banco — o `public` nunca
+foi tocado — e comparando registro a registro:
+
+| Conferido | Resultado |
+|---|---|
+| User · Unit · RecurringRule · Shift · Expense | 166 registros idênticos, campo a campo |
+| Hash de senha | preservado — os logins continuam funcionando |
+| Ids | preservados — relações e sessões sobrevivem |
+| Relação plantão → unidade | resolve para a mesma unidade |
+| Data de calendário | sem deslocamento de fuso |
+| `Decimal` de valor e horas | exatos; somas batem (R$ 252.399 / 3.157h) |
+| Array de dias da semana da recorrência | preservado |
+
+Um ponto a repetir se o teste for refeito: a limpeza automática do schema
+**falhou silenciosamente** na primeira tentativa. O schema só foi removido
+porque houve conferência depois. Nunca encerre esse teste sem checar que
+`backup_teste` sumiu.
+
 ## Limites conhecidos
 
 - **Retenção de 90 dias.** É o teto do plano gratuito do GitHub. Com execução
