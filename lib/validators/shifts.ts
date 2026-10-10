@@ -1,11 +1,11 @@
 import { z } from "zod";
 import {
+  calendarDateSchema,
   paymentStatusSchema,
   shiftModalitySchema,
   shiftTypeSchema,
 } from "@/lib/validators/common";
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_OF_DAY = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const optionalText = z
@@ -50,7 +50,7 @@ export const shiftPayloadSchema = z.object({
   endTime: timeSchema,
   notes: optionalText,
   paymentStatus: paymentStatusSchema.default("predicted"),
-  shiftDate: z.string().trim().regex(ISO_DATE, "Informe a data do plantão."),
+  shiftDate: calendarDateSchema("Informe a data do plantão."),
   shiftType: shiftTypeSchema,
   startTime: timeSchema,
   unitId: z.string().trim().min(1, "Selecione a unidade."),

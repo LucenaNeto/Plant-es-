@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { expenseCategorySchema } from "@/lib/validators/common";
-
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+import {
+  calendarDateSchema,
+  expenseCategorySchema,
+} from "@/lib/validators/common";
 
 /** Id vindo de um `<select>`: string vazia significa "não vinculado". */
 const optionalId = z.preprocess(
@@ -19,7 +20,7 @@ export const expensePayloadSchema = z
     amount: amountSchema,
     category: expenseCategorySchema,
     description: z.string().trim().min(2, "Descreva o gasto."),
-    expenseDate: z.string().trim().regex(ISO_DATE, "Informe a data do gasto."),
+    expenseDate: calendarDateSchema("Informe a data do gasto."),
     /**
      * Como o gasto se relaciona com o trabalho. Um campo explícito, em vez de
      * inferir pela presença de `unitId`/`shiftId`, torna impossível o estado

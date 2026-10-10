@@ -36,7 +36,32 @@ export function parseCalendarDate(value: string): Date {
     throw new Error(`Data de calendário inválida: ${value}`);
   }
 
+  /**
+   * O formato bater não garante que o dia exista. O `Date` do JavaScript
+   * transborda em silêncio: "2026-02-29" (ano comum) vira 1º de março, e
+   * "2026-04-31" vira 1º de maio — sem erro, sem aviso. Um plantão lançado
+   * nessas datas seria gravado no dia seguinte ao pedido e ninguém saberia por
+   * quê. A ida e volta é a checagem mais simples que fecha isso: se a data
+   * transbordou, ela não serializa de volta no que entrou.
+   */
+  if (toDateInputValue(date) !== value) {
+    throw new Error(`Data de calendário inválida: ${value}`);
+  }
+
   return date;
+}
+
+/**
+ * A string é uma data de calendário que existe? Para validação, onde a resposta
+ * é um erro de campo e não uma exceção.
+ */
+export function isCalendarDate(value: string): boolean {
+  try {
+    parseCalendarDate(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Formato "YYYY-MM-DD", para preencher `<input type="date">`. */
