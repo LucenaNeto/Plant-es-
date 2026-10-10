@@ -15,15 +15,12 @@
     "verificar": "tsc --noEmit && eslint . && node --import tsx --test \"tests/**/*.test.ts\""
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.9.1",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
-    "date-fns": "^4.4.0",
     "next": "16.3.1",
     "next-auth": "^5.0.0-beta.32",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-hook-form": "^7.85.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -36,7 +33,7 @@
     "eslint-config-next": "16.3.1",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "tsx": "^4.20.6"
+    "tsx": "^4.20.6",
+    "typescript": "^5"
   }
 }
