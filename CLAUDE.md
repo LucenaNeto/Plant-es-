@@ -23,9 +23,20 @@
     numa máquina de 8 núcleos.
   - A `DIRECT_URL` continua na **5432 sem parâmetros**: migrations precisam de
     sessão dedicada para DDL.
-- **Agrupe consultas em `$transaction`.** O custo do `pgbouncer=true` é pago por
-  transação, não por consulta: quatro consultas soltas custam ~1130ms; agrupadas,
-  ~630ms. É o que torna o transaction mode viável (medido, 2026-09-06).
+- **Gaste menos consultas, não menos `await`.** Com `connection_limit=1` nada
+  paraleliza: `Promise.all` só enfileira na mesma conexão. O tempo de uma tela é
+  praticamente `consultas × latência`, e a latência é ~65ms com o banco na
+  região atual. Quem quer uma tela rápida corta consultas — buscar o mesmo mês
+  duas vezes mudando o `select` custa o dobro.
+- **Não embrulhe leitura em `$transaction` para ganhar velocidade.** Esta regra
+  já disse o contrário, apoiada numa medição de 2026-09-06 (quatro consultas:
+  ~1130ms soltas, ~630ms agrupadas). Remedido em 2026-10-10 contra a produção,
+  para o mesmo conjunto de quatro: `await` em sequência = 4.0 viagens,
+  `Promise.all` = 3.9, `$transaction` = 5.9. BEGIN e COMMIT são duas viagens a
+  mais e não compram velocidade — compram consistência, que numa leitura da
+  própria conta é cosmética. Use transação onde a consistência é o objetivo
+  (o snapshot do backup, por exemplo), não como otimização.
+  Reproduza com `npx tsx scripts/verificar/estrategias.mts`.
 - Scripts de verificação abrem conexão: rode um de cada vez, sempre com
   `$disconnect()` em `finally`, e encerre servidores locais antes.
 
