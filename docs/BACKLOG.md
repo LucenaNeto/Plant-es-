@@ -53,21 +53,32 @@ arquivo do próprio repositório. **Decisão sua:** subir os dois majors de uma
 vez (Prisma 7 muda a API de client em alguns pontos; ESLint 10 muda a config
 flat) ou conviver com os avisos até ter motivo melhor.
 
-### 2.2 Rate limiting e cabeçalhos de segurança
+### 2.2 Rate limiting no login
 
-Não existe nenhum limite de tentativa no login. Com o app público, uma lista de
-senhas comuns roda contra `/login` sem nada no caminho.
+Não existe nenhum limite de tentativa. Com o app público, uma lista de senhas
+comuns roda contra `/login` sem nada no caminho.
 
-Também faltam `Content-Security-Policy`, `Strict-Transport-Security`,
-`X-Frame-Options` e `Referrer-Policy`.
+Dá para fazer sem dependência nova — contador em memória no `proxy.ts` —, mas
+em serverless cada instância tem a própria memória, então o limite real é
+"N tentativas por instância", o que é bem mais frouxo do que parece. Fazer
+direito pede um armazenamento compartilhado (o próprio Postgres serve).
 
-Dá para fazer sem dependência nova — contador em memória no `proxy.ts` para o
-rate limit, cabeçalhos no `next.config`. **Decisão sua:** se vale fazer agora,
-com um usuário, ou quando abrir para outras pessoas. Minha opinião: os
-cabeçalhos valem agora (são dez linhas e zero risco); o rate limit vale no dia
-em que a segunda pessoa criar conta.
+**Decisão sua:** agora, com um usuário, ou quando a segunda pessoa criar conta.
+Minha opinião: vale no dia em que a segunda conta existir — hoje o alvo é uma
+senha só, a sua, e rotacioná-la (item 1.2) protege mais que o limite.
 
-### 2.3 Três contas de teste no banco de produção
+### 2.3 `Content-Security-Policy`
+
+Os outros quatro cabeçalhos de segurança já foram: `X-Content-Type-Options`,
+`X-Frame-Options`, `Referrer-Policy` e `Permissions-Policy` estão no
+`next.config.ts` e conferidos na resposta.
+
+Falta a CSP, que é a mais valiosa e a única que pode quebrar a página: exige
+listar de onde script, estilo e imagem podem vir, e o Next injeta script inline
+com nonce. É um trabalho próprio, com teste tela a tela. **Decisão sua:** se
+vale o esforço agora.
+
+### 2.4 Três contas de teste no banco de produção
 
 | Conta | Plantões | Criada |
 |---|---|---|
