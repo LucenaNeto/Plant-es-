@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { signOut } from "next-auth/react";
 import { NavIconSvg } from "@/components/layout/nav-icon";
+import { NavRowBody, NavTabBody } from "@/components/layout/nav-tab";
 import {
   bottomNavItems,
   isActiveNavItem,
@@ -54,9 +55,7 @@ export function BottomNav() {
               return (
                 <Link
                   aria-current={ativo ? "page" : undefined}
-                  className={`flex min-h-12 items-center gap-3 rounded-md px-3 text-sm font-medium ${
-                    ativo ? "bg-zinc-950 text-white" : "text-zinc-700"
-                  }`}
+                  className="block"
                   href={item.href}
                   key={item.href}
                   // Fecha ao navegar. Feito no clique, e não num efeito sobre
@@ -64,8 +63,7 @@ export function BottomNav() {
                   // cascata para um estado que já sabemos no momento do toque.
                   onClick={() => setAberto(false)}
                 >
-                  <NavIconSvg name={item.icon} />
-                  {item.label}
+                  <NavRowBody active={ativo} item={item} tone="painel" />
                 </Link>
               );
             })}
@@ -92,16 +90,11 @@ export function BottomNav() {
             return (
               <Link
                 aria-current={ativo ? "page" : undefined}
-                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-center text-[11px] font-medium transition ${
-                  ativo
-                    ? "bg-stone-100 text-zinc-950"
-                    : "text-zinc-500 hover:bg-stone-50"
-                }`}
+                className="block"
                 href={item.href}
                 key={item.href}
               >
-                <NavIconSvg name={item.icon} />
-                {item.label}
+                <NavTabBody active={ativo} item={item} />
               </Link>
             );
           })}

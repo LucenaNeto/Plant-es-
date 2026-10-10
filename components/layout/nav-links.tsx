@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NavIconSvg } from "@/components/layout/nav-icon";
+import { NavRowBody } from "@/components/layout/nav-tab";
 import { isActiveNavItem, type NavItem } from "@/lib/navigation";
 
 /**
@@ -27,16 +27,11 @@ export function SidebarNavLinks({ items }: { items: NavItem[] }) {
         return (
           <Link
             aria-current={isActive ? "page" : undefined}
-            className={`flex items-center gap-3 rounded-md px-3 py-3 text-sm font-medium transition ${
-              isActive
-                ? "bg-zinc-950 text-white"
-                : "text-zinc-600 hover:bg-stone-100 hover:text-zinc-950"
-            }`}
+            className="block"
             href={item.href}
             key={item.href}
           >
-            <NavIconSvg name={item.icon} />
-            {item.label}
+            <NavRowBody active={isActive} item={item} tone="lateral" />
           </Link>
         );
       })}
