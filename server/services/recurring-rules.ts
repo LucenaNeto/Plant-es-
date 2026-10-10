@@ -70,8 +70,9 @@ function serializeRule(
 
 export type SerializedRule = ReturnType<typeof serializeRule>;
 
-export async function listRules(userId: string): Promise<SerializedRule[]> {
-  const rules = await prisma.recurringRule.findMany({
+/** As regras do usuário, **sem executar** — para agrupar com outras consultas. */
+export function rulesQuery(userId: string) {
+  return prisma.recurringRule.findMany({
     include: {
       _count: { select: { shifts: true } },
       unit: { select: { name: true } },
@@ -79,23 +80,44 @@ export async function listRules(userId: string): Promise<SerializedRule[]> {
     orderBy: [{ active: "desc" }, { createdAt: "desc" }],
     where: { userId },
   });
+}
 
-  if (rules.length === 0) {
-    return [];
-  }
-
-  // Uma consulta para o horizonte de todas as regras, em vez de uma por regra.
-  const ultimos = await prisma.shift.groupBy({
+/**
+ * Até quando cada regra já tem plantão criado, **sem executar**.
+ *
+ * Filtra por `recurringRuleId: { not: null }` em vez da lista de ids das
+ * regras. O resultado é o mesmo — um plantão só aponta para uma regra do
+ * próprio dono —, mas assim a consulta não depende do retorno da anterior e
+ * as duas cabem na mesma transação. Pedir os ids primeiro custaria uma ida
+ * extra ao banco só para montar um `IN` que o `userId` já delimita.
+ */
+export function ruleHorizonQuery(userId: string) {
+  return prisma.shift.groupBy({
     _max: { shiftDate: true },
     by: ["recurringRuleId"],
-    where: { recurringRuleId: { in: rules.map((r) => r.id) }, userId },
+    where: { recurringRuleId: { not: null }, userId },
   });
+}
 
+/** Junta regras e horizontes. Puro, sem tocar no banco. */
+export function buildRules(
+  rules: Awaited<ReturnType<typeof rulesQuery>>,
+  horizons: Awaited<ReturnType<typeof ruleHorizonQuery>>,
+): SerializedRule[] {
   const horizonte = new Map(
-    ultimos.map((linha) => [linha.recurringRuleId, linha._max.shiftDate]),
+    horizons.map((linha) => [linha.recurringRuleId, linha._max.shiftDate]),
   );
 
   return rules.map((rule) => serializeRule(rule, horizonte.get(rule.id) ?? null));
+}
+
+export async function listRules(userId: string): Promise<SerializedRule[]> {
+  const [rules, horizons] = await Promise.all([
+    rulesQuery(userId),
+    ruleHorizonQuery(userId),
+  ]);
+
+  return buildRules(rules, horizons);
 }
 
 /**

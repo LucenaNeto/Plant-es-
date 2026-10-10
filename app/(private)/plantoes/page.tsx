@@ -9,9 +9,7 @@ import { requireSession } from "@/lib/auth/session";
 import { todayAsCalendarDate } from "@/lib/dates/calendar-date";
 import { formatCurrency } from "@/lib/format";
 import { shiftFiltersSchema } from "@/lib/validators/shifts";
-import { listRules } from "@/server/services/recurring-rules";
-import { listShifts, summarizeShifts } from "@/server/services/shifts";
-import { listUnits } from "@/server/services/units";
+import { getShiftsScreen } from "@/server/services/screens";
 
 export const metadata: Metadata = {
   description: "Lance, edite e acompanhe o recebimento dos seus plantões.",
@@ -61,12 +59,10 @@ export default async function PlantoesPage({
   const session = await requireSession();
   const filters = resolveFilters(await searchParams);
 
-  const [shifts, units, summary, rules] = await Promise.all([
-    listShifts(session.user.id, filters),
-    listUnits(session.user.id),
-    summarizeShifts(session.user.id, filters),
-    listRules(session.user.id),
-  ]);
+  const { rules, shifts, summary, units } = await getShiftsScreen(
+    session.user.id,
+    filters,
+  );
 
   return (
     <div className="space-y-5">

@@ -11,9 +11,7 @@ import {
 } from "@/lib/expenses/labels";
 import { formatCurrency } from "@/lib/format";
 import { expenseFiltersSchema } from "@/lib/validators/expenses";
-import { listExpenses, summarizeExpenses } from "@/server/services/expenses";
-import { listShifts } from "@/server/services/shifts";
-import { listUnits } from "@/server/services/units";
+import { getExpensesScreen } from "@/server/services/screens";
 
 export const metadata: Metadata = {
   description: "Gastos operacionais gerais ou vinculados a unidade e plantão.",
@@ -59,18 +57,10 @@ export default async function GastosPage({
   const session = await requireSession();
   const filters = resolveFilters(await searchParams);
 
-  const [expenses, units, summary, shifts] = await Promise.all([
-    listExpenses(session.user.id, filters),
-    listUnits(session.user.id),
-    summarizeExpenses(session.user.id, filters),
-    // Plantões do mesmo mês alimentam o seletor de vínculo do formulário.
-    listShifts(session.user.id, {
-      month: filters.month,
-      paymentStatus: undefined,
-      unitId: undefined,
-      year: filters.year,
-    }),
-  ]);
+  const { expenses, shifts, summary, units } = await getExpensesScreen(
+    session.user.id,
+    filters,
+  );
 
   return (
     <div className="space-y-5">

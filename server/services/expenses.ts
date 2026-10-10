@@ -78,10 +78,11 @@ async function resolveLink(
   return { link: { shiftId: null, unitId: null } };
 }
 
-export async function listExpenses(userId: string, filters: ExpenseFilters) {
+/** Os gastos do mês filtrado, **sem executar** — para agrupar numa transação. */
+export function expensesQuery(userId: string, filters: ExpenseFilters) {
   const { start, end } = monthRange(filters.year, filters.month);
 
-  const expenses = await prisma.expense.findMany({
+  return prisma.expense.findMany({
     include: WITH_LINKS,
     orderBy: [{ expenseDate: "desc" }, { createdAt: "desc" }],
     where: {
@@ -91,6 +92,10 @@ export async function listExpenses(userId: string, filters: ExpenseFilters) {
       ...(filters.unitId ? { unitId: filters.unitId } : {}),
     },
   });
+}
+
+export async function listExpenses(userId: string, filters: ExpenseFilters) {
+  const expenses = await expensesQuery(userId, filters);
 
   return expenses.map(serializeExpense);
 }
@@ -192,13 +197,17 @@ export async function deleteExpense(userId: string, expenseId: string) {
 }
 
 /** Total do mês e quebra por categoria, para o cabeçalho da lista. */
-export async function summarizeExpenses(
-  userId: string,
-  filters: ExpenseFilters,
-) {
+/**
+ * O agrupamento por categoria, **sem executar**.
+ *
+ * Diferente de `expensesQuery`, ignora o filtro de categoria de propósito: o
+ * resumo mostra todas as categorias lado a lado, e filtrá-lo junto com a lista
+ * deixaria o painel com uma barra só sempre que o usuário escolhesse uma.
+ */
+export function expenseSummaryQuery(userId: string, filters: ExpenseFilters) {
   const { start, end } = monthRange(filters.year, filters.month);
 
-  const grouped = await prisma.expense.groupBy({
+  return prisma.expense.groupBy({
     _count: { _all: true },
     _sum: { amount: true },
     by: ["category"],
@@ -208,7 +217,12 @@ export async function summarizeExpenses(
       ...(filters.unitId ? { unitId: filters.unitId } : {}),
     },
   });
+}
 
+/** Monta o resumo a partir do agrupamento já buscado. Puro. */
+export function buildExpenseSummary(
+  grouped: Awaited<ReturnType<typeof expenseSummaryQuery>>,
+) {
   const byCategory = grouped
     .map((row) => ({
       amount: row._sum.amount?.toNumber() ?? 0,
@@ -226,7 +240,14 @@ export async function summarizeExpenses(
   };
 }
 
-export type ExpenseSummary = Awaited<ReturnType<typeof summarizeExpenses>>;
+export async function summarizeExpenses(
+  userId: string,
+  filters: ExpenseFilters,
+) {
+  return buildExpenseSummary(await expenseSummaryQuery(userId, filters));
+}
+
+export type ExpenseSummary = ReturnType<typeof buildExpenseSummary>;
 
 /** Total de gastos do mês, para o líquido do dashboard e das finanças. */
 export async function sumExpensesForMonth(

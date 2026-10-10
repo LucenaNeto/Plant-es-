@@ -11,8 +11,7 @@ import {
   PAYMENT_STATUS_LABELS,
   SHIFT_TYPE_LABELS,
 } from "@/lib/shifts/labels";
-import { getReport, listReportYears } from "@/server/services/reports";
-import { listUnits } from "@/server/services/units";
+import { getReportsScreen } from "@/server/services/screens";
 
 export const metadata: Metadata = {
   description: "Relatório de plantões por unidade, com horas e valores.",
@@ -78,11 +77,11 @@ export default async function RelatoriosPage({
   const session = await requireSession();
   const filtros = resolveFilters(await searchParams);
 
-  const [relatorio, units, years] = await Promise.all([
-    getReport(session.user.id, filtros),
-    listUnits(session.user.id),
-    listReportYears(session.user.id),
-  ]);
+  const {
+    report: relatorio,
+    units,
+    years,
+  } = await getReportsScreen(session.user.id, filtros);
 
   const { showValues } = filtros;
   const periodo = filtros.month

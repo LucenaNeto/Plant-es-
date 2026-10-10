@@ -66,51 +66,74 @@ function periodRange(filters: ReportFilters) {
   };
 }
 
-export async function getReport(userId: string, filters: ReportFilters) {
+/**
+ * As três consultas do relatório, **sem executá-las**, uma por função.
+ *
+ * Separadas da montagem para que a tela possa mandar junto o que ela também
+ * precisa — a lista de unidades e os anos do seletor — numa transação só.
+ * Três funções em vez de uma tupla porque cada tipo de retorno fica explícito
+ * e a assinatura de `buildReport` se escreve sozinha a partir deles.
+ */
+export function reportUserQuery(userId: string) {
+  return prisma.user.findUniqueOrThrow({
+    select: { name: true, profession: true, specialty: true },
+    where: { id: userId },
+  });
+}
+
+export function reportShiftsQuery(userId: string, filters: ReportFilters) {
   const { start, end } = periodRange(filters);
 
-  const [user, shifts, serie] = await prisma.$transaction([
-    prisma.user.findUniqueOrThrow({
-      select: { name: true, profession: true, specialty: true },
-      where: { id: userId },
-    }),
-    prisma.shift.findMany({
-      include: { unit: { select: { name: true } } },
-      orderBy: [{ shiftDate: "asc" }, { startTime: "asc" }],
-      where: {
-        shiftDate: { gte: start, lt: end },
-        userId,
-        ...(filters.unitId ? { unitId: filters.unitId } : {}),
-      },
-    }),
-    /**
-     * Agregado por ano e mês em SQL, e não em memória: os gráficos precisam do
-     * histórico inteiro, e trazer todos os plantões de todos os anos para somar
-     * no servidor deixaria de escalar já no segundo ano de uso.
-     *
-     * `handoffTo IS NULL` exclui os repassados dos totais, como no financeiro.
-     */
-    prisma.$queryRaw<SeriesRow[]>`
-      SELECT
-        EXTRACT(YEAR FROM "shiftDate")::int  AS ano,
-        EXTRACT(MONTH FROM "shiftDate")::int AS mes,
-        COALESCE(SUM("hours"), 0)::float     AS horas,
-        COALESCE(SUM("value"), 0)::float     AS valor,
-        -- Recebido separado do bruto: a diferença entre os dois é exatamente
-        -- o que ainda precisa ser cobrado, e é o número que o comparativo
-        -- existe para revelar.
-        COALESCE(SUM(CASE WHEN "paymentStatus" = 'received' THEN "value" ELSE 0 END), 0)::float
-                                             AS recebido,
-        COUNT(*)::int                        AS plantoes
-      FROM "Shift"
-      WHERE "userId" = ${userId}
-        AND "handoffTo" IS NULL
-        ${filters.unitId ? Prisma.sql`AND "unitId" = ${filters.unitId}` : Prisma.empty}
-      GROUP BY 1, 2
-      ORDER BY 1, 2
-    `,
-  ]);
+  return prisma.shift.findMany({
+    include: { unit: { select: { name: true } } },
+    orderBy: [{ shiftDate: "asc" }, { startTime: "asc" }],
+    where: {
+      shiftDate: { gte: start, lt: end },
+      userId,
+      ...(filters.unitId ? { unitId: filters.unitId } : {}),
+    },
+  });
+}
 
+/**
+ * Agregado por ano e mês em SQL, e não em memória: os gráficos precisam do
+ * histórico inteiro, e trazer todos os plantões de todos os anos para somar no
+ * servidor deixaria de escalar já no segundo ano de uso.
+ *
+ * `handoffTo IS NULL` exclui os repassados dos totais, como no financeiro.
+ */
+export function reportSeriesQuery(userId: string, filters: ReportFilters) {
+  return prisma.$queryRaw<SeriesRow[]>`
+    SELECT
+      EXTRACT(YEAR FROM "shiftDate")::int  AS ano,
+      EXTRACT(MONTH FROM "shiftDate")::int AS mes,
+      COALESCE(SUM("hours"), 0)::float     AS horas,
+      COALESCE(SUM("value"), 0)::float     AS valor,
+      -- Recebido separado do bruto: a diferença entre os dois é exatamente
+      -- o que ainda precisa ser cobrado, e é o número que o comparativo
+      -- existe para revelar.
+      COALESCE(SUM(CASE WHEN "paymentStatus" = 'received' THEN "value" ELSE 0 END), 0)::float
+                                           AS recebido,
+      COUNT(*)::int                        AS plantoes
+    FROM "Shift"
+    WHERE "userId" = ${userId}
+      AND "handoffTo" IS NULL
+      ${filters.unitId ? Prisma.sql`AND "unitId" = ${filters.unitId}` : Prisma.empty}
+    GROUP BY 1, 2
+    ORDER BY 1, 2
+  `;
+}
+
+export type ReportUser = Awaited<ReturnType<typeof reportUserQuery>>;
+export type ReportShiftRow = Awaited<ReturnType<typeof reportShiftsQuery>>[number];
+
+/** Monta o relatório a partir das linhas já buscadas. Puro, sem banco. */
+export function buildReport(
+  filters: ReportFilters,
+  user: ReportUser,
+  shifts: ReportShiftRow[],
+  serie: SeriesRow[],
+) {
   const linhas: ReportShift[] = shifts.map((shift) => ({
     category: shift.category,
     dateLabel: formatShortDate(shift.shiftDate),
@@ -284,14 +307,28 @@ export async function getReport(userId: string, filters: ReportFilters) {
   };
 }
 
-export type Report = Awaited<ReturnType<typeof getReport>>;
+export async function getReport(userId: string, filters: ReportFilters) {
+  const [user, shifts, serie] = await Promise.all([
+    reportUserQuery(userId),
+    reportShiftsQuery(userId, filters),
+    reportSeriesQuery(userId, filters),
+  ]);
 
-/** Anos com plantão lançado, para o seletor de período. */
-export async function listReportYears(userId: string) {
-  const linhas = await prisma.$queryRaw<{ ano: number }[]>`
+  return buildReport(filters, user, shifts, serie);
+}
+
+export type Report = ReturnType<typeof buildReport>;
+
+/** Anos com plantão lançado, para o seletor de período — sem executar. */
+export function reportYearsQuery(userId: string) {
+  return prisma.$queryRaw<{ ano: number }[]>`
     SELECT DISTINCT EXTRACT(YEAR FROM "shiftDate")::int AS ano
     FROM "Shift" WHERE "userId" = ${userId} ORDER BY 1 DESC
   `;
+}
+
+export async function listReportYears(userId: string) {
+  const linhas = await reportYearsQuery(userId);
 
   return linhas.map((l) => l.ano);
 }

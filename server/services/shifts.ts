@@ -67,23 +67,47 @@ async function assertUsableUnit(
   return null;
 }
 
-export async function listShifts(userId: string, filters: ShiftFilters) {
+/**
+ * Os plantões do mês, **sem executar** e **sem o filtro de situação**.
+ *
+ * A ausência do `paymentStatus` aqui é deliberada e é o que permite servir a
+ * lista e os totais com uma consulta só: os totais sempre consideram o mês
+ * inteiro (previsto, pendente e recebido lado a lado — filtrá-los junto com a
+ * lista esvaziaria o cabeçalho ao escolher uma situação), e a lista é este
+ * mesmo conjunto peneirado. Buscar duas vezes a mesma faixa de datas, mudando
+ * só o `select`, era uma ida ao banco paga para nada.
+ */
+export function monthShiftsQuery(userId: string, filters: ShiftFilters) {
   const { start, end } = monthRange(filters.year, filters.month);
 
-  const shifts = await prisma.shift.findMany({
+  return prisma.shift.findMany({
     include: WITH_UNIT_NAME,
     orderBy: [{ shiftDate: "asc" }, { startTime: "asc" }],
     where: {
       shiftDate: { gte: start, lt: end },
       userId,
       ...(filters.unitId ? { unitId: filters.unitId } : {}),
-      ...(filters.paymentStatus
-        ? { paymentStatus: filters.paymentStatus }
-        : {}),
     },
   });
+}
 
-  return shifts.map(serializeShift);
+/** Aplica o filtro de situação sobre o mês já carregado. Puro. */
+export function filterByPaymentStatus(
+  shifts: SerializedShift[],
+  paymentStatus?: PaymentStatus,
+) {
+  return paymentStatus
+    ? shifts.filter((shift) => shift.paymentStatus === paymentStatus)
+    : shifts;
+}
+
+export async function listShifts(userId: string, filters: ShiftFilters) {
+  const shifts = await monthShiftsQuery(userId, filters);
+
+  return filterByPaymentStatus(
+    shifts.map(serializeShift),
+    filters.paymentStatus,
+  );
 }
 
 export async function findShift(userId: string, shiftId: string) {
@@ -520,18 +544,8 @@ export async function findNextShift(userId: string) {
  * números diferentes para o mesmo mês em telas vizinhas e não saberia em qual
  * acreditar.
  */
-export async function summarizeShifts(userId: string, filters: ShiftFilters) {
-  const { start, end } = monthRange(filters.year, filters.month);
-
-  const shifts = await prisma.shift.findMany({
-    select: { handoffTo: true, hours: true, paymentStatus: true, value: true },
-    where: {
-      shiftDate: { gte: start, lt: end },
-      userId,
-      ...(filters.unitId ? { unitId: filters.unitId } : {}),
-    },
-  });
-
+/** Soma os totais a partir dos plantões já carregados. Puro, sem banco. */
+export function summarizeSerializedShifts(shifts: SerializedShift[]) {
   const empty = { count: 0, hours: 0, value: 0 };
   const summary: Record<PaymentStatus | "total" | "handedOff", typeof empty> = {
     handedOff: { ...empty },
@@ -542,18 +556,18 @@ export async function summarizeShifts(userId: string, filters: ShiftFilters) {
   };
 
   for (const shift of shifts) {
-    const valor = shift.value.toNumber();
-    const horas = shift.hours.toNumber();
-    const alvo = shift.handoffTo ? summary.handedOff : summary[shift.paymentStatus];
+    const alvo = shift.handoffTo
+      ? summary.handedOff
+      : summary[shift.paymentStatus];
 
     alvo.count += 1;
-    alvo.hours += horas;
-    alvo.value += valor;
+    alvo.hours += shift.hours;
+    alvo.value += shift.value;
 
     if (!shift.handoffTo) {
       summary.total.count += 1;
-      summary.total.hours += horas;
-      summary.total.value += valor;
+      summary.total.hours += shift.hours;
+      summary.total.value += shift.value;
     }
   }
 
@@ -566,4 +580,10 @@ export async function summarizeShifts(userId: string, filters: ShiftFilters) {
   return summary;
 }
 
-export type ShiftSummary = Awaited<ReturnType<typeof summarizeShifts>>;
+export async function summarizeShifts(userId: string, filters: ShiftFilters) {
+  const shifts = await monthShiftsQuery(userId, filters);
+
+  return summarizeSerializedShifts(shifts.map(serializeShift));
+}
+
+export type ShiftSummary = ReturnType<typeof summarizeSerializedShifts>;

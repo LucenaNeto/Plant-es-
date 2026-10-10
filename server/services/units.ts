@@ -27,17 +27,33 @@ function toDecimal(value: number | null | undefined) {
     : new Prisma.Decimal(value);
 }
 
-export async function listUnits(
+/**
+ * A consulta das unidades, **sem executá-la**.
+ *
+ * Existe para que uma tela que também precisa de plantões ou gastos possa
+ * mandar tudo numa `$transaction` só. Com `connection_limit=1` as consultas
+ * não paralelizam de verdade — um `Promise.all` só enfileira —, e o custo do
+ * `pgbouncer=true` é cobrado por transação, não por consulta (ver CLAUDE.md).
+ * Agrupar é, na prática, a diferença entre uma ida ao banco e quatro.
+ */
+export function unitsQuery(
   userId: string,
   options: { onlyActive?: boolean } = {},
 ) {
-  const units = await prisma.unit.findMany({
+  return prisma.unit.findMany({
     orderBy: [{ active: "desc" }, { name: "asc" }],
     where: {
       userId,
       ...(options.onlyActive ? { active: true } : {}),
     },
   });
+}
+
+export async function listUnits(
+  userId: string,
+  options: { onlyActive?: boolean } = {},
+) {
+  const units = await unitsQuery(userId, options);
 
   return units.map(serializeUnit);
 }
