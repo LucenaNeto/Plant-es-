@@ -232,7 +232,27 @@ tempo de tela é rede. Os índices atuais cobrem os caminhos por usuário e por
 data. Reabrir quando a tabela de plantões passar de alguns milhares de linhas —
 `npx tsx scripts/verificar/explain.mts` refaz a conta.
 
-### 5.3 Banco de homologação
+### 5.3 O `.env` local discorda da produção — e isso já me fez errar
+
+O `.env` desta máquina tem a `DATABASE_URL` na **porta 5432, sem
+`pgbouncer=true`**. A produção usa **6543 com `pgbouncer=true`**. São dois
+regimes de conexão com comportamento oposto, e o `CLAUDE.md` exige o segundo.
+
+Duas consequências, uma já aconteceu:
+
+1. **Toda medição feita localmente mente.** Hoje eu medi nessa URL, concluí que
+   agrupar consultas em `$transaction` custava caro, troquei as transações por
+   `Promise.all` no app inteiro e escrevi no `CLAUDE.md` que a regra antiga
+   estava errada. Na URL da produção a conta se inverte: `$transaction` custa
+   2.2 idas contra 4.0. Eu teria dobrado o tempo de toda tela. Está desfeito,
+   mas só porque fui conferir outra coisa e esbarrei no `.env`.
+2. **Session mode prende conexão.** Foi o que derrubou a produção em setembro:
+   um `npm run dev` segurando conexões do mesmo pool que a Vercel usa.
+
+Corrigir é trocar a porta e acrescentar `?pgbouncer=true&connection_limit=1` no
+`.env` local — mas é o seu arquivo de credenciais, então não mexi.
+
+### 5.4 Banco de homologação
 
 Você já mencionou querer um quando houver usuário de verdade. Hoje o `.env`
 local aponta para produção, o que significa que qualquer engano meu numa
@@ -243,13 +263,13 @@ entrar a segunda pessoa. Minha opinião: agora, porque o custo é zero e a
 proteção é imediata — e porque hoje a única coisa entre um `migrate reset` e os
 seus dados é eu lembrar de não digitar.
 
-### 5.4 Quatorze branches antigas já mescladas
+### 5.5 Quatorze branches antigas já mescladas
 
 `feature/agenda-real`, `feature/gastos-crud`, `feature/plantoes-crud` e mais
 onze estão no `main` há semanas e continuam na lista. Apagar é um comando, mas
 apagar branch é irreversível no local — então fica com você.
 
-### 5.5 Recuperação de senha
+### 5.6 Recuperação de senha
 
 Ficou fora do MVP por decisão sua. Continua fora. Hoje, se você perder a senha,
 a saída é um `UPDATE` manual no banco. Depende de serviço de e-mail, então
