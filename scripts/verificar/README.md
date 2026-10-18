@@ -1,9 +1,14 @@
 # Scripts de verificação
 
-Scripts de leitura que rodam contra o banco configurado no `.env` — que é o de
-**produção**. Nenhum deles escreve nada; ainda assim, as regras do `CLAUDE.md`
-valem: rode um de cada vez, e encerre o servidor local antes
+Scripts que rodam contra o banco configurado no `.env` — que é o de
+**produção**. Rode um de cada vez e encerre o servidor local antes
 (`connection_limit=1` significa uma conexão só).
+
+Todos são de leitura, **com uma exceção marcada na tabela**:
+`recorrencia-duplicada.mts` escreve, mas só em registros que ele mesmo cria —
+um usuário descartável que ele apaga no `finally`, conferindo a limpeza antes
+de sair. A conferência existe porque a limpeza automática já falhou em silêncio
+uma vez neste projeto (ver [docs/BACKUP.md](../../docs/BACKUP.md)).
 
 | Script | O que responde |
 |---|---|
