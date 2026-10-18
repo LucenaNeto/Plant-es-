@@ -9,6 +9,9 @@ valem: rode um de cada vez, e encerre o servidor local antes
 |---|---|
 | `estrategias.mts` | Quanto custa uma ida ao banco, e se `await` em sequência, `Promise.all` ou `$transaction` fazem diferença |
 | `medir-telas.mts` | Quanto cada tela demora e quantas consultas ela faz |
+| `conexoes.mts` | Se as duas conexões do `.env` respondem, e em que regime cada uma está |
+| `recorrencia-duplicada.mts` | Prova que repetir semanal não duplica o plantão do dia escolhido — **este escreve**, num usuário descartável que ele apaga |
+| `duplicados.mts` | Quais plantões estão repetidos no banco |
 | `explain.mts` | O plano e o tempo de execução real de cada consulta quente |
 | `retrato.mts` | Quantos plantões, gastos e unidades existem, e quanto está em aberto |
 | `contas.mts` | Quantas contas existem no banco (sem imprimir e-mail) |

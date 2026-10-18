@@ -290,25 +290,21 @@ tempo de tela é rede. Os índices atuais cobrem os caminhos por usuário e por
 data. Reabrir quando a tabela de plantões passar de alguns milhares de linhas —
 `npx tsx scripts/verificar/explain.mts` refaz a conta.
 
-### 5.3 O `.env` local discorda da produção — e isso já me fez errar
+### 5.3 ~~O `.env` local discorda da produção~~ — resolvido em 2026-10-18
 
-O `.env` desta máquina tem a `DATABASE_URL` na **porta 5432, sem
-`pgbouncer=true`**. A produção usa **6543 com `pgbouncer=true`**. São dois
-regimes de conexão com comportamento oposto, e o `CLAUDE.md` exige o segundo.
+A `DATABASE_URL` local estava na porta 5432 sem `pgbouncer`, enquanto a
+produção usa 6543 com `pgbouncer=true`. Trocada com sua autorização; a
+`DIRECT_URL` ficou como estava, na 5432 sem parâmetros, porque migrations
+precisam de sessão dedicada.
 
-Duas consequências, uma já aconteceu:
+Fica registrado o que isso causou, porque o padrão pode voltar: medindo na 5432
+eu concluí que agrupar consultas em `$transaction` custava caro, troquei por
+`Promise.all` no app inteiro e escrevi no `CLAUDE.md` que a regra antiga estava
+errada. Na URL da produção a conta se inverte. Teria dobrado o tempo de toda
+tela.
 
-1. **Toda medição feita localmente mente.** Hoje eu medi nessa URL, concluí que
-   agrupar consultas em `$transaction` custava caro, troquei as transações por
-   `Promise.all` no app inteiro e escrevi no `CLAUDE.md` que a regra antiga
-   estava errada. Na URL da produção a conta se inverte: `$transaction` custa
-   2.2 idas contra 4.0. Eu teria dobrado o tempo de toda tela. Está desfeito,
-   mas só porque fui conferir outra coisa e esbarrei no `.env`.
-2. **Session mode prende conexão.** Foi o que derrubou a produção em setembro:
-   um `npm run dev` segurando conexões do mesmo pool que a Vercel usa.
-
-Corrigir é trocar a porta e acrescentar `?pgbouncer=true&connection_limit=1` no
-`.env` local — mas é o seu arquivo de credenciais, então não mexi.
+`npx tsx scripts/verificar/conexoes.mts` confere as duas conexões e avisa se
+alguma sair do lugar.
 
 ### 5.4 Banco de homologação
 
