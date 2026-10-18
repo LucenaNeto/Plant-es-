@@ -238,12 +238,23 @@ export function QuickShiftForm({
             precisa ir junto.
           */}
           {notes ? <input name="notes" type="hidden" value={notes} /> : null}
+          {/*
+            Mesma caixa com borda de "Repetir toda ...", logo abaixo. Como link
+            de texto sublinhado, isto passava despercebido entre dois campos
+            altos — a pessoa procurava um campo e varria a tela atrás de uma
+            borda. Parecer com o vizinho é o que faz o olho encontrar.
+          */}
           <button
-            className="text-left text-sm font-medium text-teal-700 underline"
+            className="flex min-h-12 w-full items-center justify-between gap-3 rounded-md border border-zinc-200 px-3 text-left"
             onClick={() => setNotesOpen(true)}
             type="button"
           >
-            {notes ? "Editar observação" : "+ Observação"}
+            <span className="text-sm font-medium text-zinc-700">
+              {notes ? "Observação" : "Adicionar observação"}
+            </span>
+            <span className="truncate text-sm text-zinc-500">
+              {notes ? notes : "opcional"}
+            </span>
           </button>
         </>
       )}
