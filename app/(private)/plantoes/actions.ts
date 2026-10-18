@@ -165,6 +165,7 @@ export async function saveShiftAction(
           userId,
           { ...payload, confirmOverlap },
           recurrence.data.repeatWeekdays,
+          shift.id,
         );
 
         if (rule) {

@@ -122,6 +122,7 @@ export async function createRuleFromShift(
   userId: string,
   payload: ShiftPayload,
   weekdays: number[],
+  seedShiftId: string,
 ) {
   const unicos = [...new Set(weekdays)].sort((a, b) => a - b);
 
@@ -129,18 +130,45 @@ export async function createRuleFromShift(
     return null;
   }
 
-  return prisma.recurringRule.create({
-    data: {
-      defaultCategory: payload.category,
-      defaultShiftType: payload.shiftType,
-      defaultValue: new Prisma.Decimal(payload.value),
-      endTime: payload.endTime,
-      replicateFutureMonths: true,
-      startTime: payload.startTime,
-      unitId: payload.unitId,
-      userId,
-      weekdays: unicos,
-    },
+  /**
+   * **O plantão-semente é vinculado à regra na mesma transação em que ela
+   * nasce.** Sem isso, ele continuava sendo um plantão avulso que por acaso
+   * caía num dia da série, e `generateShifts` — que procura duplicata apenas
+   * entre os plantões já ligados à regra — não o enxergava. Resultado: ao
+   * lançar um plantão marcando "repetir", o dia escolhido ficava com dois
+   * plantões idênticos.
+   *
+   * Vincular também é o que está semanticamente certo: o semente é a primeira
+   * ocorrência da série, não um plantão parecido ao lado dela. Apagar a regra
+   * depois não o apaga — `recurringRuleId` usa `onDelete: SetNull`.
+   *
+   * Transação interativa porque o `update` precisa do id que o `create` acabou
+   * de gerar. Se o vínculo falhar, a regra não chega a existir — melhor do que
+   * uma regra órfã que duplicaria o semente na primeira geração.
+   */
+  return prisma.$transaction(async (tx) => {
+    const rule = await tx.recurringRule.create({
+      data: {
+        defaultCategory: payload.category,
+        defaultShiftType: payload.shiftType,
+        defaultValue: new Prisma.Decimal(payload.value),
+        endTime: payload.endTime,
+        replicateFutureMonths: true,
+        startTime: payload.startTime,
+        unitId: payload.unitId,
+        userId,
+        weekdays: unicos,
+      },
+    });
+
+    await tx.shift.updateMany({
+      data: { recurringRuleId: rule.id },
+      // `updateMany` com o dono no `where`: um `update` por id sozinho
+      // aceitaria um plantão de outra conta.
+      where: { id: seedShiftId, userId },
+    });
+
+    return rule;
   });
 }
 
