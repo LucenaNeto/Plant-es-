@@ -78,7 +78,33 @@ listar de onde script, estilo e imagem podem vir, e o Next injeta script inline
 com nonce. É um trabalho próprio, com teste tela a tela. **Decisão sua:** se
 vale o esforço agora.
 
-### 2.4 Três contas de teste no banco de produção
+### 2.4 Seis plantões duplicados já no banco, por causa do bug da recorrência
+
+O bug foi consertado em `734321f`, mas ele já deixou rastro nos seus dados:
+
+| Data | Unidade | Valor |
+|---|---|---|
+| 2026-09-08 | Hospital Regional de Santana do Ipanema | R$ 2.000 |
+| 2026-09-15 | Hospital Regional de Santana do Ipanema | R$ 2.000 |
+| 2026-09-22 | Hospital Regional de Santana do Ipanema | R$ 2.000 |
+| 2026-09-27 | UPA Noel Macedo (19:00–07:00) | R$ 1.024 |
+| 2026-09-29 | Hospital Regional de Santana do Ipanema | R$ 2.000 |
+| 2026-10-20 | hospital teste 1 | R$ 1.800 |
+
+**R$ 10.824 e seis plantões a mais do que você realmente fez**, inflando
+faturamento, horas e tudo que deles depende — inclusive os números que eu usei
+para escrever este backlog.
+
+Cinco são do padrão do bug (um dos dois com regra, outro sem). O de 27/09 na
+UPA tem os dois sem regra, então pode ser lançamento repetido à mão em vez do
+bug — vale você olhar antes.
+
+Apagar é escrita nos seus dados reais, então fica com você. Se autorizar, eu
+escrevo o script apagando sempre a cópia **sem** regra (preservando a da série),
+com a lista do que vai sair impressa antes e a conferência depois.
+`npx tsx scripts/verificar/duplicados.mts` reconta a qualquer momento.
+
+### 2.5 Três contas de teste no banco de produção
 
 | Conta | Plantões | Criada |
 |---|---|---|
