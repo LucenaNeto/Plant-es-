@@ -167,7 +167,39 @@ ou valor por plantão? (c) isso vira um terceiro "líquido" ou substitui o atual
 Esta é a mudança de maior alcance da lista: mexe no financeiro, no relatório e
 no significado da palavra "líquido" em todas as telas.
 
-### 3.6 Renomear "modalidade"
+### 3.6 Observação no lançamento rápido, e no histórico
+
+**Pedido seu, 2026-10-18.**
+
+Conferi, e o quadro é um pouco diferente do que parecia pela tela:
+
+| Onde | Campo de observação |
+|---|---|
+| Formulário completo (Plantões → Novo plantão) | **tem** |
+| Formulário completo (editar plantão) | **tem** — é o mesmo formulário |
+| Lançamento rápido pelo calendário | **não tem** |
+| Card do plantão | já exibe, quando preenchido |
+| Exportação CSV e TXT | **não sai** |
+
+Ou seja: o campo não é exclusivo da edição — ele falta no **lançamento rápido
+pelo calendário**, que é justamente o caminho mais usado, porque é o que abre
+ao tocar no dia. E, mesmo preenchida, a observação não aparece em relatório
+nenhum.
+
+São duas mudanças, e a segunda é a que vale mais:
+
+1. **Campo no lançamento rápido.** Um `textarea` curto, abaixo do valor. O
+   painel já está comprido no celular (a captura mostra ele ocupando a tela
+   inteira), então ou o campo entra recolhido — "+ observação" que expande —,
+   ou o painel ganha rolagem. **Decisão sua:** qual dos dois.
+2. **Observação no histórico.** Hoje ela só existe no card. Para "constar no
+   histórico" ela precisa entrar na exportação TXT e CSV — e aí vem a pergunta
+   que eu não sei responder: a observação costuma ser informação sua (*"troquei
+   com o Dr. Paulo"*) ou informação que vai junto numa prestação de contas
+   para o hospital? **Decisão sua**, porque muda se ela entra na exportação
+   sempre, nunca, ou só quando você marcar.
+
+### 3.7 Renomear "modalidade"
 
 Verde, amarelo e vermelho estão rotulados como "modalidade" na interface. A
 palavra não diz nada sozinha. **Decisão sua:** trocar por quê? "Risco"?
@@ -276,6 +308,46 @@ a saída é um `UPDATE` manual no banco. Depende de serviço de e-mail, então
 anda junto com o 4.3.
 
 ---
+
+### 5.7 A navegação entre telas está com atraso perceptível
+
+**Relatado por você, 2026-10-18.** E tem fundamento medido.
+
+Cada tela privada consulta o Postgres antes de renderizar, e com o pooler em
+transaction mode a conta medida em 2026-10-10 foi esta:
+
+| Tela | Consultas | Tempo só de banco |
+|---|---|---|
+| Relatórios | 5 | 779ms |
+| Início | 4 | 790ms |
+| Plantões | 4 | 787ms |
+| Gastos | 4 | 674ms |
+| Agenda | 2 | 472ms |
+
+Isso é **antes** do render e da rede do navegador. Em cima disso a navegação
+ainda espera o servidor inteiro antes de pintar qualquer coisa.
+
+O que já foi feito na branch `feature/desempenho-e-testes` ataca parte disso: a
+aba acende no toque em vez de ficar apagada esperando, os esqueletos de
+carregamento têm a forma de cada tela, e o número de consultas caiu (plantões
+5→4, agenda 3→2, relatórios 3 transações→1). **Vale medir de novo depois de
+mesclar** — pode ser que resolva o que você está sentindo.
+
+Se continuar lento, as saídas em ordem de retorno:
+
+1. **Medir da Vercel, não daqui.** Os 250ms por transação que medi são desta
+   máquina até o Supabase. De dentro da Vercel, na mesma região, deve ser bem
+   menos. Se o atraso que você sente é no celular, pode ser rede do aparelho e
+   não banco — e aí o conserto é outro. **Primeiro passo: descobrir qual dos
+   dois.**
+2. **`cacheComponents` + `partialPrefetching`** (Next 16.4). Faz a casca da
+   tela aparecer instantaneamente e só os dados chegarem depois. É a solução
+   de verdade, e é a que muda como **toda** página renderiza e é cacheada —
+   num app que mostra quanto você tem a receber, servir dado de alguns
+   segundos atrás é decisão de produto. **Decisão sua.**
+3. **Cortar mais consultas.** Relatórios ainda faz cinco. Dá para fundir o
+   agregado da série com a lista do período, mas o ganho é uma ida de ~150ms —
+   pequeno perto dos dois itens acima.
 
 ## 6. Interação
 
