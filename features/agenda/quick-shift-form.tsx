@@ -47,6 +47,14 @@ export function QuickShiftForm({
       : "",
   );
   const [repeatWeekly, setRepeatWeekly] = useState(false);
+  const [notes, setNotes] = useState("");
+  /**
+   * A observação começa recolhida. O painel já ocupa a tela inteira do celular
+   * com unidade, duração, início, valor e repetição — e observação é campo
+   * ocasional: quem precisa dela sabe que precisa, e quem não precisa não
+   * deveria rolar mais um campo em branco para chegar no botão de salvar.
+   */
+  const [notesOpen, setNotesOpen] = useState(false);
 
   const [state, formAction, isPending] = useActionState(
     saveShiftAction.bind(null, null),
@@ -202,6 +210,43 @@ export function QuickShiftForm({
           <FieldErrors messages={errors.value} />
         </div>
       </div>
+
+      {notesOpen ? (
+        <div>
+          <label
+            className="mb-1.5 block text-sm font-medium text-zinc-600"
+            htmlFor="quick-notes"
+          >
+            Observação
+          </label>
+          <textarea
+            autoFocus
+            className="w-full rounded-md border border-zinc-200 px-3 py-2 text-base outline-none focus:border-teal-500"
+            id="quick-notes"
+            name="notes"
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder="Troca, combinado de pagamento, o que for útil lembrar depois"
+            rows={2}
+            value={notes}
+          />
+        </div>
+      ) : (
+        <>
+          {/*
+            O campo some do formulário quando recolhido, mas o valor digitado
+            não: se a pessoa escreveu, recolheu e salvou, a observação ainda
+            precisa ir junto.
+          */}
+          {notes ? <input name="notes" type="hidden" value={notes} /> : null}
+          <button
+            className="text-left text-sm font-medium text-teal-700 underline"
+            onClick={() => setNotesOpen(true)}
+            type="button"
+          >
+            {notes ? "Editar observação" : "+ Observação"}
+          </button>
+        </>
+      )}
 
       <label className="flex items-center gap-3 rounded-md border border-zinc-200 px-3 py-3">
         <input
